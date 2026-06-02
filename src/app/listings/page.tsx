@@ -1,15 +1,22 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 export default function ListingsPage() {
+  const router = useRouter()
   const supabase = createClient()
+  
+  // Data States
   const [listings, setListings] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
+  
+  // UI Logic States
   const [filter, setFilter] = useState({ type: 'all', purpose: 'all' })
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null) // 'type' | 'purpose' | null
 
   useEffect(() => {
     setMounted(true)
@@ -27,197 +34,184 @@ export default function ListingsPage() {
     setLoading(false)
   }
 
+  const toggleDropdown = (name: string) => {
+    setOpenDropdown(openDropdown === name ? null : name)
+  }
+
   if (!mounted) return null
 
   return (
-    <div style={{ background: '#080810', minHeight: '100vh', color: '#fff', paddingBottom: '80px' }}>
+    <div style={{ background: '#080810', minHeight: '100vh', color: '#fff', paddingBottom: '100px' }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&display=swap');
         
         *, *::before, *::after { box-sizing: border-box; }
         body { font-family: 'Outfit', sans-serif; margin: 0; }
 
-        /* --- Hero & Filters --- */
+        /* --- Back Arrow --- */
+        .back-btn {
+          position: fixed; top: 25px; left: 25px; z-index: 1001;
+          background: rgba(12, 12, 12, 0.5); backdrop-filter: blur(10px);
+          border: 1px solid rgba(255,255,255,0.1); border-radius: 12px;
+          padding: 10px 15px; color: #C9A84C; text-decoration: none;
+          display: flex; align-items: center; gap: 8px; font-weight: 800;
+          font-size: 12px; transition: 0.3s ease;
+        }
+        .back-btn:hover { background: #C9A84C; color: #000; transform: translateX(-5px); }
+
+        /* --- Hero --- */
         .hero-section { 
-          background: linear-gradient(to bottom, rgba(8,8,16,0.7), #080810), url('https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=1200&q=80'); 
-          background-size: cover; 
-          background-position: center; 
-          padding: 120px 20px 60px; 
-          text-align: center; 
+          background: linear-gradient(to bottom, rgba(8,8,16,0.8), #080810), url('https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=1200&q=80'); 
+          background-size: cover; background-position: center; 
+          padding: 140px 20px 60px; text-align: center; 
         }
 
-        .filter-container {
-          display: inline-flex;
-          gap: 12px;
-          background: rgba(255,255,255,0.03);
-          backdrop-filter: blur(15px);
-          padding: 10px;
-          border-radius: 20px;
-          border: 1px solid rgba(255,255,255,0.08);
-          margin-top: 30px;
+        /* --- Custom Premium Dropdown --- */
+        .filter-grid { display: flex; gap: 15px; justify-content: center; margin-top: 30px; }
+        
+        .custom-dropdown { position: relative; width: 280px; }
+        
+        .dropdown-trigger {
+          background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+          padding: 14px 20px; border-radius: 16px; cursor: pointer;
+          display: flex; justify-content: space-between; align-items: center;
+          font-weight: 700; font-size: 13px; letter-spacing: 0.5px; transition: 0.3s;
         }
+        .dropdown-trigger:hover { border-color: #C9A84C; background: rgba(255,255,255,0.08); }
 
-        .filter-select { 
-          background: transparent; 
-          border: none; 
-          color: #fff; 
-          padding: 10px 20px; 
-          border-radius: 12px; 
-          outline: none; 
-          cursor: pointer; 
-          font-family: 'Outfit', sans-serif;
-          font-weight: 600;
-          font-size: 14px;
-          transition: 0.3s; 
+        .dropdown-content {
+          position: absolute; top: 110%; left: 0; right: 0; 
+          background: #111118; border-radius: 18px; border: 1px solid rgba(255,255,255,0.1);
+          z-index: 100; overflow: hidden;
+          max-height: 0; opacity: 0; transform: translateY(-10px);
+          transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+          box-shadow: 0 20px 50px rgba(0,0,0,0.6);
         }
-        .filter-select:hover { background: rgba(255,255,255,0.05); }
-        .filter-select option { background: #0c0c0c; color: #fff; }
+        .dropdown-content.show { max-height: 400px; opacity: 1; transform: translateY(0); padding: 8px; }
 
-        /* --- Grid & Cards --- */
+        .dropdown-item {
+          padding: 12px 18px; border-radius: 12px; cursor: pointer; font-size: 14px;
+          color: rgba(255,255,255,0.6); transition: 0.2s; font-weight: 500;
+        }
+        .dropdown-item:hover { background: rgba(201,168,76,0.1); color: #C9A84C; }
+        .dropdown-item.active { background: rgba(201,168,76,0.05); color: #C9A84C; font-weight: 700; }
+
+        /* --- Cards --- */
         .listings-grid { 
-          display: grid; 
-          grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); 
-          gap: 30px; 
-          padding: 0 40px; 
-          max-width: 1400px; 
-          margin: 0 auto; 
+          display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); 
+          gap: 35px; padding: 0 50px; max-width: 1400px; margin: 0 auto; 
         }
 
         .p-card { 
-          background: #111118; 
-          border-radius: 28px; 
-          border: 1px solid rgba(255,255,255,0.05); 
-          overflow: hidden; 
-          transition: all 0.4s cubic-bezier(0.2, 0, 0, 1);
-          cursor: pointer;
+          background: #111118; border-radius: 30px; border: 1px solid rgba(255,255,255,0.04); 
+          overflow: hidden; transition: all 0.4s cubic-bezier(0.2, 0, 0, 1); cursor: pointer;
         }
-        .p-card:hover { 
-          transform: translateY(-10px); 
-          border-color: rgba(201,168,76,0.3); 
-          box-shadow: 0 20px 40px rgba(0,0,0,0.6); 
+        .p-card:hover { transform: translateY(-12px); border-color: rgba(201,168,76,0.3); }
+
+        .price-chip { 
+          position: absolute; bottom: 20px; left: 20px; 
+          background: #C9A84C; color: #000; padding: 8px 18px; 
+          border-radius: 14px; font-weight: 900; font-size: 22px; font-family: 'Bebas Neue'; 
         }
 
-        .p-img-wrapper { height: 240px; width: 100%; position: relative; overflow: hidden; }
-        .p-img { width: 100%; height: 100%; object-fit: cover; transition: 0.8s ease; }
-        .p-card:hover .p-img { transform: scale(1.1); }
-
-        .price-badge { 
-          position: absolute; bottom: 15px; left: 15px; 
-          background: #C9A84C; color: #000; 
-          padding: 6px 16px; border-radius: 12px; 
-          font-weight: 900; font-size: 20px; font-family: 'Bebas Neue'; 
-          box-shadow: 0 4px 15px rgba(201,168,76,0.4);
-        }
-
-        .type-tag { 
-          position: absolute; top: 15px; left: 15px; 
-          background: rgba(0,0,0,0.5); backdrop-filter: blur(8px); 
-          padding: 5px 12px; border-radius: 8px; 
-          font-size: 10px; font-weight: 800; 
-          text-transform: uppercase; letter-spacing: 1px; 
-          border: 1px solid rgba(255,255,255,0.1);
-        }
-
-        .verified-dot { color: #4ade80; font-size: 12px; display: flex; align-items: center; gap: 4px; font-weight: bold; }
-
-        /* --- Shimmer Effect --- */
-        .shimmer {
-          background: linear-gradient(90deg, #111 25%, #1a1a25 50%, #111 75%);
-          background-size: 200% 100%;
-          animation: loading 1.5s infinite;
-        }
+        .shimmer { background: linear-gradient(90deg, #0c0c0c 25%, #16161c 50%, #0c0c0c 75%); background-size: 200% 100%; animation: loading 1.5s infinite; }
         @keyframes loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 
-        /* --- MOBILE OPTIMIZATIONS --- */
         @media (max-width: 768px) {
-          .hero-section { padding: 100px 20px 40px; }
-          .hero-section h1 { font-size: 3rem !important; line-height: 1; }
-          
-          .filter-container { 
-            flex-direction: column; 
-            width: 100%; 
-            padding: 8px; 
-            border-radius: 18px; 
-            margin-top: 20px;
-          }
-          .filter-select { width: 100%; text-align: center; border: 1px solid rgba(255,255,255,0.05); }
-
-          .listings-grid { grid-template-columns: 1fr; padding: 0 20px; gap: 20px; }
-          .p-img-wrapper { height: 200px; }
+          .back-btn { top: 15px; left: 15px; }
+          .hero-section h1 { font-size: 3.2rem !important; }
+          .filter-grid { flex-direction: column; padding: 0 20px; }
+          .custom-dropdown { width: 100%; }
+          .listings-grid { grid-template-columns: 1fr; padding: 0 20px; }
         }
       `}</style>
 
-      {/* ── HEADER & FILTERS ── */}
+      {/* ── TOP NAV ACTION ── */}
+      <Link href="/" className="back-btn">
+        <span>←</span> HOME
+      </Link>
+
+      {/* ── HERO & CUSTOM FILTERS ── */}
       <section className="hero-section">
-        <h1 style={{ fontFamily: 'Bebas Neue', fontSize: '5.5rem', letterSpacing: '-1px', marginBottom: '8px' }}>
-          Explore <span style={{ color: '#C9A84C' }}>Verified</span> Properties
+        <h1 style={{ fontFamily: 'Bebas Neue', fontSize: '6rem', letterSpacing: '-1px', lineHeight: 0.9 }}>
+          Exclusive <span style={{ color: '#C9A84C' }}>Kenya</span> Properties
         </h1>
-        <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '15px' }}>Premium real estate listings curated for the Kenyan market</p>
+        <p style={{ color: '#555', marginTop: '15px' }}>Discover verified luxury homes and land across the country.</p>
         
-        <div className="filter-container">
-          <select className="filter-select" onChange={(e) => setFilter({...filter, type: e.target.value})}>
-            <option value="all">ALL PROPERTY TYPES</option>
-            <option value="house">HOUSES</option>
-            <option value="apartment">APARTMENTS</option>
-            <option value="land">LAND / PLOTS</option>
-            <option value="commercial">COMMERCIAL</option>
-          </select>
-          <div style={{ width: '1px', height: '24px', background: 'rgba(255,255,255,0.1)', margin: 'auto' }} className="desktop-nav" />
-          <select className="filter-select" onChange={(e) => setFilter({...filter, purpose: e.target.value})}>
-            <option value="all">ANY PURPOSE</option>
-            <option value="sale">FOR SALE</option>
-            <option value="rent">FOR RENT</option>
-          </select>
+        <div className="filter-grid">
+          {/* Custom Property Type Dropdown */}
+          <div className="custom-dropdown">
+             <div className="dropdown-trigger" onClick={() => toggleDropdown('type')}>
+                <span>{filter.type === 'all' ? 'ALL CATEGORIES' : filter.type.toUpperCase()}</span>
+                <span style={{ color: '#C9A84C', transition: '0.3s', transform: openDropdown === 'type' ? 'rotate(180deg)' : 'none' }}>▼</span>
+             </div>
+             <div className={`dropdown-content ${openDropdown === 'type' ? 'show' : ''}`}>
+                {['all', 'house', 'apartment', 'land', 'commercial'].map(item => (
+                  <div key={item} className={`dropdown-item ${filter.type === item ? 'active' : ''}`} onClick={() => { setFilter({...filter, type: item}); setOpenDropdown(null); }}>
+                    {item === 'all' ? 'VIEW ALL CATEGORIES' : item.toUpperCase()}
+                  </div>
+                ))}
+             </div>
+          </div>
+
+          {/* Custom Purpose Dropdown */}
+          <div className="custom-dropdown">
+             <div className="dropdown-trigger" onClick={() => toggleDropdown('purpose')}>
+                <span>{filter.purpose === 'all' ? 'ANY STATUS' : filter.purpose === 'sale' ? 'FOR SALE' : 'FOR RENT'}</span>
+                <span style={{ color: '#C9A84C', transition: '0.3s', transform: openDropdown === 'purpose' ? 'rotate(180deg)' : 'none' }}>▼</span>
+             </div>
+             <div className={`dropdown-content ${openDropdown === 'purpose' ? 'show' : ''}`}>
+                {['all', 'sale', 'rent'].map(item => (
+                  <div key={item} className={`dropdown-item ${filter.purpose === item ? 'active' : ''}`} onClick={() => { setFilter({...filter, purpose: item}); setOpenDropdown(null); }}>
+                    {item === 'all' ? 'ALL STATUS' : item === 'sale' ? 'BUY PROPERTY' : 'RENT PROPERTY'}
+                  </div>
+                ))}
+             </div>
+          </div>
         </div>
       </section>
 
-      {/* ── LISTINGS GRID ── */}
+      {/* ── LISTINGS FEED ── */}
       <div className="listings-grid">
         {loading ? (
-           // Premium Skeletons
-           [1,2,3,4,5,6].map(i => (
-             <div key={i} className="shimmer" style={{ height: '380px', borderRadius: '28px' }}></div>
-           ))
+           [1,2,3].map(i => <div key={i} className="shimmer" style={{ height: '400px', borderRadius: '30px' }}></div>)
         ) : listings.length > 0 ? (
           listings.map(p => (
             <Link key={p.id} href={`/properties/${p.id}`} style={{ textDecoration: 'none' }}>
               <div className="p-card">
-                <div className="p-img-wrapper">
+                <div style={{ position: 'relative', overflow: 'hidden', height: '260px' }}>
                   <img 
-                    className="p-img" 
-                    src={p.property_images?.[0]?.url || 'https://via.placeholder.com/600x400?text=Betterment+Property'} 
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    src={p.property_images?.[0]?.url || 'https://via.placeholder.com/600x400?text=Listing+Photo'} 
                     alt={p.title}
                   />
-                  <div className="type-tag">{p.property_type}</div>
-                  <div className="price-badge">KES {p.price?.toLocaleString()}</div>
+                  <div className="price-chip">KES {p.price?.toLocaleString()}</div>
                 </div>
                 
-                <div style={{ padding: '25px' }}>
-                  <div className="verified-dot">
-                     <span>✅</span> VERIFIED LISTING
+                <div style={{ padding: '30px' }}>
+                  <div style={{ color: '#4ade80', fontSize: '11px', fontWeight: '900', letterSpacing: '1px', marginBottom: '10px' }}>
+                    VERIFIED ASSET
                   </div>
-                  <h3 style={{ color: '#fff', fontSize: '20px', margin: '12px 0', textTransform: 'capitalize', fontWeight: '700' }}>
+                  <h3 style={{ color: '#fff', fontSize: '22px', margin: '0 0 10px', textTransform: 'capitalize', fontFamily: 'Outfit' }}>
                     {p.title}
                   </h3>
                   
-                  <div style={{ display: 'flex', gap: '15px', color: '#555', fontSize: '13px', fontWeight: 'bold' }}>
+                  <div style={{ display: 'flex', gap: '20px', color: '#444', fontSize: '13px', fontWeight: 'bold' }}>
                     <span>🛏 {p.bedrooms || 0} BEDS</span>
                     <span>🚿 {p.bathrooms || 0} BATHS</span>
-                    <span>📐 {p.listing_purpose === 'sale' ? 'FOR SALE' : 'FOR RENT'}</span>
                   </div>
 
-                  <div style={{ marginTop: '24px', paddingTop: '18px', borderTop: '1px solid rgba(255,255,255,0.04)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: '#C9A84C', fontWeight: '900', fontSize: '12px', letterSpacing: '1px' }}>VIEW DETAILS →</span>
-                    <span style={{ color: '#333', fontSize: '11px' }}>{new Date(p.created_at).toLocaleDateString()}</span>
+                  <div style={{ marginTop: '25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: '#C9A84C', fontWeight: '900', fontSize: '11px', letterSpacing: '1.5px' }}>VIEW LISTING →</span>
+                    <span style={{ color: '#222', fontSize: '10px' }}>{new Date(p.created_at).getFullYear()}</span>
                   </div>
                 </div>
               </div>
             </Link>
           ))
         ) : (
-          <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '100px 0' }}>
-             <p style={{ color: '#333', fontSize: '18px', fontWeight: '600' }}>No active listings found matching your search.</p>
-             <button onClick={() => setFilter({type: 'all', purpose: 'all'})} style={{ background: 'none', border: 'none', color: '#C9A84C', cursor: 'pointer', fontWeight: 'bold', marginTop: '10px' }}>Clear all filters</button>
+          <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '100px 0', color: '#444' }}>
+             No properties match your current filters.
           </div>
         )}
       </div>

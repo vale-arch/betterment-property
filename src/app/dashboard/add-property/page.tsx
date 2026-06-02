@@ -130,14 +130,15 @@ export default function AddPropertyPage() {
   return (
     <div style={{ background: '#080810', minHeight: '100vh', padding: '40px 20px', color: '#fff' }}>
       <style>{`
-        .form-card { max-width: 800px; margin: 0 auto; background: #111118; border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 40px; }
+        *, *::before, *::after { box-sizing: border-box; }
+        .form-card { width: 100%; max-width: 100%; margin: 0 auto; background: #111118; border: 1px solid rgba(255,255,255,0.05); border-radius: 24px; padding: 24px; }
         .input-group { margin-bottom: 20px; }
         label { display: block; font-size: 12px; color: #888; text-transform: uppercase; margin-bottom: 8px; font-weight: 700; }
         input, select, textarea { width: 100%; background: #080810; border: 1.5px solid #222; border-radius: 12px; padding: 12px; color: #fff; outline: none; }
         input:focus { border-color: #C9A84C; }
-        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
         .btn-submit { background: #C9A84C; color: #000; width: 100%; padding: 15px; border: none; border-radius: 12px; font-weight: 800; cursor: pointer; margin-top: 20px; }
-        @media (max-width: 600px) { .grid-2 { grid-template-columns: 1fr; } .form-card { padding: 20px; } }
+        @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } .form-card { padding: 20px 16px; } input, select, textarea { font-size: 16px; width: 100%; max-width: 100%; } }
       `}</style>
 
       <div className="form-card">

@@ -190,6 +190,10 @@ export default function AgentDashboard() {
             <button className={`nav-item ${tab === 'my-listings' ? 'active' : ''}`} onClick={() => {setTab('my-listings'); setSidebarOpen(false)}}>🏠 My Properties</button>
             <button className={`nav-item ${tab === 'inquiries' ? 'active' : ''}`} onClick={() => {setTab('inquiries'); setSidebarOpen(false)}}>✉️ Customer Leads ({inquiries.length})</button>
             <button className={`nav-item ${tab === 'profile' ? 'active' : ''}`} onClick={() => {setTab('profile'); setSidebarOpen(false)}}>👤 Profile & Contact</button>
+            <Link href="/" className="nav-item" style={{ textDecoration: 'none', color: 'rgba(255,255,255,0.7)', borderBottom: '1px solid rgba(255,255,255,0.05)', marginBottom: '15px', paddingBottom: '15px' }}>
+            <span style={{ fontSize: '18px' }}>🌐</span> 
+            <span>Home Page</span>
+            </Link>
           </nav>
 
           <button onClick={handleSignOut} className="nav-item" style={{ color: '#ff4444', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '20px', marginTop: '20px' }}>🚪 Logout Session</button>

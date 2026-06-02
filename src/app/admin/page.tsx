@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
@@ -137,6 +138,10 @@ export default function AdminPage() {
           </div>
 
           <nav style={{ flex: 1 }}>
+            <Link href="/" className="nav-item" style={{ textDecoration: 'none', color: 'rgba(255,255,255,0.7)', borderBottom: '1px solid rgba(255,255,255,0.05)', marginBottom: '15px', paddingBottom: '15px' }}>
+            <span style={{ fontSize: '18px' }}>🏠</span> 
+            <span>RETURN TO WEBSITE</span>
+            </Link>
             <button className={`nav-item ${tab === 'overview' ? 'active' : ''}`} onClick={() => { setTab('overview'); setSidebarOpen(false); }}>📊 Dashboard Overview</button>
             <button className={`nav-item ${tab === 'listings' ? 'active' : ''}`} onClick={() => { setTab('listings'); setSidebarOpen(false); }}>🏠 Property Control</button>
             <button className={`nav-item ${tab === 'agents' ? 'active' : ''}`} onClick={() => { setTab('agents'); setSidebarOpen(false); }}>👥 Agent Management</button>

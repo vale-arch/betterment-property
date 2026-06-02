@@ -12,8 +12,9 @@ export default function HomePage() {
   // --- UI & Animation States ---
   const [purpose, setPurpose] = useState('sale')
   const [scrolled, setScrolled] = useState(false)
-  const [heroLoaded, setHeroLoaded] = useState(false)
+  const [heroLoaded, setHeroLoaded] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [visible, setVisible] = useState<Record<string, boolean>>({})
   const obsRefs = useRef<Record<string, HTMLElement | null>>({})
 
@@ -30,7 +31,6 @@ export default function HomePage() {
       setUser(user)
     }
     checkUser()
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
     })
@@ -40,7 +40,7 @@ export default function HomePage() {
   }, [])
 
   const fetchLatestListings = async () => {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('properties')
       .select('*, property_images(url)')
       .eq('listing_status', 'active')
@@ -51,14 +51,13 @@ export default function HomePage() {
   }
 
   useEffect(() => {
-    const t = setTimeout(() => setHeroLoaded(true), 100)
-    const onScroll = () => setScrolled(window.scrollY > 50)
-    window.addEventListener('scroll', onScroll)
-    return () => {
-      clearTimeout(t)
-      window.removeEventListener('scroll', onScroll)
+    const onScroll = () => {
+        setScrolled(window.scrollY > 50)
+        if (window.scrollY > 100 && menuOpen) setMenuOpen(false)
     }
-  }, [])
+    window.addEventListener('scroll', onScroll)
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [menuOpen])
 
   useEffect(() => {
     const io = new IntersectionObserver(
@@ -81,7 +80,7 @@ export default function HomePage() {
     transition: `opacity 0.8s cubic-bezier(0.16,1,0.3,1) ${delay}ms, transform 0.8s cubic-bezier(0.16,1,0.3,1) ${delay}ms`,
   })
 
-  const handleSignOut = async () => {
+  const handleSignOut = async () => { 
     await supabase.auth.signOut()
     router.refresh()
     setMenuOpen(false)
@@ -100,10 +99,11 @@ export default function HomePage() {
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         html { scroll-behavior: smooth; }
         body { font-family: 'Outfit', sans-serif; background: #0c0c0c; color: #fff; overflow-x: hidden; }
-        
+
         @keyframes shimmer { 0% { background-position:-200% center; } 100% { background-position:200% center; } }
         @keyframes heroImg { from { opacity:0; transform:scale(1.05); } to { opacity:1; transform:scale(1); } }
         @keyframes ticker { 0% { transform:translateX(0); } 100% { transform:translateX(-50%); } }
+        @keyframes menuSlide { from { opacity:0; transform:translateY(-10px); } to { opacity:1; transform:translateY(0); } }
 
         .nav-a { color:rgba(255,255,255,0.7); text-decoration:none; font-size:14px; font-weight:500; transition:all 0.2s; }
         .nav-a:hover { color:#C9A84C; }
@@ -121,85 +121,72 @@ export default function HomePage() {
         .search-input { background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); border-radius:14px; padding:14px 18px; color:#fff; font-family:'Outfit',sans-serif; width:100%; outline:none; font-size: 15px; }
         .search-input:focus { border-color:#C9A84C; background:rgba(255,255,255,0.1); }
 
-        /* Custom Select Arrow - remains the same */
-.search-select {
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23C9A84C'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 16px center;
-  background-size: 18px;
-  padding-right: 40px !important;
-}
+        .search-card-responsive {
+          background: rgba(12, 12, 12, 0.8);
+          backdrop-filter: blur(20px);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 24px;
+          padding: 24px;
+          width: 100%;
+          max-width: 900px;
+          box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+          margin: 0 auto;
+        }
 
-/* The Container */
-.search-card-responsive {
-  background: rgba(12, 12, 12, 0.8);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 24px;
-  padding: 24px;
-  width: 100%;
-  max-width: 900px;
-  box-shadow: 0 20px 50px rgba(0,0,0,0.5);
-  margin: 0 auto;
-}
+        .search-layout-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 16px;
+        }
 
-/* The Layout Engine */
-.search-layout-grid {
-  display: grid;
-  grid-template-columns: 1fr; /* Mobile: 1 Column */
-  gap: 16px;
-}
+        @media (min-width: 768px) {
+          .search-layout-grid {
+            grid-template-columns: 2fr 1fr 1fr;
+            align-items: flex-end;
+            gap: 12px;
+          }
+          .input-wrapper { margin-bottom: 0 !important; }
+        }
 
-/* LAPTOP VIEW FIX */
-@media (min-width: 768px) {
-  .search-layout-grid {
-    grid-template-columns: 2fr 1fr 1fr; /* Laptop: 3 Columns in one row */
-    align-items: flex-end; /* Keeps labels on top, inputs aligned at bottom */
-    gap: 12px;
-  }
+        .input-label-premium {
+          font-size: 10px;
+          font-weight: 800;
+          color: #666;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+          margin-bottom: 8px;
+          display: block;
+        }
 
-  .input-wrapper {
-    margin-bottom: 0 !important; /* Remove the mobile spacing on laptop */
-  }
-}
+        .dropdown-content {
+          max-height: 0;
+          overflow: hidden;
+          transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          background: #1a1a1a;
+          border-radius: 12px;
+          margin-top: 5px;
+          border: 1px solid rgba(255,255,255,0.05);
+          position: absolute;
+          width: 100%;
+          z-index: 50;
+        }
+        .dropdown-content.open { max-height: 200px; padding: 5px 0; }
+        .dropdown-item {
+          padding: 12px 18px;
+          cursor: pointer;
+          font-size: 14px;
+          transition: background 0.2s;
+        }
+        .dropdown-item:hover { background: rgba(201,168,76,0.1); color: #C9A84C; }
 
-.input-label-premium {
-  font-size: 10px;
-  font-weight: 800;
-  color: #666;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  margin-bottom: 8px;
-  display: block;
-}
-
-        /* --- MOBILE PREMIUM FIXES --- */
         @media (max-width: 768px) {
           .nav-container { padding: 0 20px !important; }
           .desktop-nav { display:none !important; }
           .mobile-btn { display:flex !important; align-items: center; justify-content: center; }
-          
           .hero-section { padding: 0 20px !important; text-align: center; justify-content: center !important; }
-          .hero-title { font-size: 3.5rem !important; margin-bottom: 20px !important; line-height: 1 !important; }
-          
-          .search-card { 
-            padding: 20px !important; 
-            margin-top: 20px;
-            width: 100% !important;
-            border-radius: 24px !important;
-          }
-          .search-row-grid { 
-            display: flex !important; 
-            flex-direction: column !important; 
-            gap: 15px !important; 
-          }
-          .search-btn-mobile { width: 100% !important; height: 55px !important; justify-content: center !important; font-size: 16px !important; }
-
+          .hero-title { font-size: 3.5rem !important; margin-bottom: 20px !important; line-height: 1.1 !important; }
           .section-pad { padding: 60px 20px !important; }
           .listings-grid { grid-template-columns: 1fr !important; gap: 20px !important; }
-          .section-header { flex-direction: column !important; align-items: center !important; text-align: center; gap: 20px; }
-          
           .footer-container { padding: 40px 20px !important; }
           .footer-grid-mobile { grid-template-columns: 1fr !important; text-align: center; gap: 40px !important; }
         }
@@ -247,18 +234,19 @@ export default function HomePage() {
             )}
           </div>
 
-          <button className="mobile-btn" onClick={() => setMenuOpen(!menuOpen)} style={{ display: 'none', background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '10px', width: '42px', height: '42px', color: '#C9A84C' }}>
+          <button className="mobile-btn" onClick={() => setMenuOpen(!menuOpen)} style={{ display: 'none', background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '10px', width: '42px', height: '42px', color: '#C9A84C', cursor: 'pointer' }}>
             {menuOpen ? '✕' : '☰'}
           </button>
         </div>
 
-        {/* Mobile menu overlay */}
         {menuOpen && (
-          <div style={{ position: 'fixed', inset: 0, top: '72px', background: '#0c0c0c', padding: '40px 20px', display: 'flex', flexDirection: 'column', gap: '25px', zIndex: 999, animation: 'fadeIn 0.3s ease' }}>
+          <div style={{ position: 'fixed', inset: 0, top: '72px', background: '#0c0c0c', padding: '40px 20px', display: 'flex', flexDirection: 'column', gap: '25px', zIndex: 999 }}>
              <Link href="/listings" style={{ fontSize: '24px', fontWeight: 'bold', textDecoration: 'none', color: '#fff' }} onClick={() => setMenuOpen(false)}>Browse All Properties</Link>
              {user ? (
                <>
-                 <Link href="/dashboard" style={{ fontSize: '20px', color: '#C9A84C', textDecoration: 'none' }} onClick={() => setMenuOpen(false)}>Go to Dashboard</Link>
+                 {(user.user_metadata?.role === 'admin' || user.user_metadata?.role === 'agent') && (
+                    <Link href={user.user_metadata?.role === 'admin' ? '/admin' : '/dashboard'} style={{ fontSize: '20px', color: '#C9A84C', textDecoration: 'none' }} onClick={() => setMenuOpen(false)}>Go to Dashboard</Link>
+                 )}
                  <button onClick={handleSignOut} style={{ textAlign: 'left', fontSize: '18px' }} className="btn-logout">Logout Account</button>
                </>
              ) : (
@@ -276,81 +264,55 @@ export default function HomePage() {
         <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?w=1800&q=85)`, backgroundSize: 'cover', backgroundPosition: 'center', animation: 'heroImg 1.5s ease both', zIndex: -1 }} />
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, #0c0c0c 10%, transparent 80%), linear-gradient(to right, rgba(0,0,0,0.7) 0%, transparent 100%)', zIndex: -1 }} />
 
-        <div style={{ maxWidth: '900px', zIndex: 1 }}>
-          <h1 className="hero-title" style={{ fontFamily: 'Bebas Neue', fontSize: '7rem', lineHeight: 0.85, marginBottom: '30px', animation: heroLoaded ? 'fadeIn 1s ease 0.2s both' : 'none' }}>
+        <div style={{ maxWidth: '900px', zIndex: 1, margin: scrolled ? '0' : '0 auto', textAlign: scrolled ? 'left' : 'center' }}>
+          <h1 className="hero-title" style={{ fontFamily: 'Bebas Neue', fontSize: '7rem', lineHeight: 0.85, marginBottom: '30px' }}>
             Find Your <span style={{ color: '#C9A84C', background: 'linear-gradient(135deg,#C9A84C,#F0D98A)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', animation: 'shimmer 4s linear infinite', backgroundSize: '200%' }}>Dream Home</span> in Kenya
           </h1>
 
-           <div className="search-card-responsive">
-  <div className="search-layout-grid">
-    
-    {/* 1. Location Input */}
-    <div className="input-wrapper">
-      <label className="input-label-premium">Where are you looking?</label>
-      <div style={{ position: 'relative' }}>
-        <span style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', opacity: 0.5 }}>📍</span>
-        <input 
-          className="search-input" 
-          placeholder="e.g. Karen, Nairobi..." 
-          style={{ paddingLeft: '44px', height: '54px' }}
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
-      </div>
-    </div>
+          <div className="search-card-responsive">
+            <div className="search-layout-grid">
+              
+              <div className="input-wrapper">
+                <label className="input-label-premium">Where are you looking?</label>
+                <div style={{ position: 'relative' }}>
+                  <span style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', opacity: 0.5 }}>📍</span>
+                  <input className="search-input" placeholder="e.g. Karen, Nairobi..." style={{ paddingLeft: '44px', height: '54px' }} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                </div>
+              </div>
 
-    {/* 2. Purpose Dropdown */}
-    <div className="input-wrapper">
-      <label className="input-label-premium">Purpose</label>
-      <select 
-        className="search-input search-select" 
-        style={{ height: '54px', fontWeight: '600' }}
-        onChange={(e) => setPurpose(e.target.value)}
-      >
-        <option value="sale">Buy House</option>
-        <option value="rent">Rent House</option>
-        <option value="land">Buy Land</option>
-      </select>
-    </div>
+              <div className="input-wrapper" style={{ position: 'relative' }}>
+                <label className="input-label-premium">Purpose</label>
+                <div className="search-input" onClick={() => setIsDropdownOpen(!isDropdownOpen)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', height: '54px' }}>
+                  <span>{purpose === 'sale' ? 'Buy House' : purpose === 'rent' ? 'Rent House' : 'Buy Land'}</span>
+                  <span style={{ color: '#C9A84C', transform: isDropdownOpen ? 'rotate(180deg)' : 'none', transition: '0.3s' }}>▼</span>
+                </div>
+                <div className={`dropdown-content ${isDropdownOpen ? 'open' : ''}`}>
+                  <div className="dropdown-item" onClick={() => { setPurpose('sale'); setIsDropdownOpen(false); }}>Buy House</div>
+                  <div className="dropdown-item" onClick={() => { setPurpose('rent'); setIsDropdownOpen(false); }}>Rent House</div>
+                  <div className="dropdown-item" onClick={() => { setPurpose('land'); setIsDropdownOpen(false); }}>Buy Land</div>
+                </div>
+              </div>
 
-    {/* 3. Search Button */}
-    <button 
-      onClick={handleSearch} 
-      className="btn-gold" 
-      style={{ 
-        width: '100%', 
-        height: '54px', 
-        borderRadius: '14px', 
-        fontSize: '14px',
-        fontWeight: '800',
-        letterSpacing: '1px'
-      }}
-    >
-      SEARCH
-    </button>
-
-  </div>
-</div>
+              <button onClick={handleSearch} className="btn btn-gold" style={{ height: '54px', fontWeight: '800', width: '100%' }}>SEARCH</button>
+            </div>
           </div>
-        
+        </div>
       </section>
 
-      {/* ── TICKER ── */}
       <div style={{ background: '#C9A84C', padding: '12px 0', overflow: 'hidden', whiteSpace: 'nowrap' }}>
         <div style={{ display: 'inline-block', animation: 'ticker 25s linear infinite' }}>
           {[...Array(10)].map((_, i) => (
-            <span key={i} style={{ color: '#000', fontWeight: '900', padding: '0 40px', fontSize: '12px', letterSpacing: '1px' }}>VERIFIED LISTINGS • ALL 47 COUNTIES • ZERO SCAMS • BETTERMENT GROUP PROPERTY •</span>
+            <span key={i} style={{ color: '#000', fontWeight: '900', padding: '0 40px', fontSize: '12px' }}>VERIFIED LISTINGS • ALL 47 COUNTIES • ZERO SCAMS • BETTERMENT GROUP PROPERTY •</span>
           ))}
         </div>
       </div>
 
-      {/* ── LIVE DATA LISTINGS ── */}
       <section className="section-pad" style={{ padding: '100px 50px' }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
           <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '50px' }}>
             <div>
                <h2 style={{ fontFamily: 'Bebas Neue', fontSize: '4.5rem', lineHeight: 1 }}>Recent <span style={{ color: '#C9A84C' }}>Uploads</span></h2>
-               <p style={{ color: '#555', marginTop: '10px', fontSize: '15px' }}>Explore the newest verified properties on the market today.</p>
+               <p style={{ color: '#555', marginTop: '10px' }}>Explore the newest verified properties on the market today.</p>
             </div>
             <Link href="/listings"><button className="btn" style={{ background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid #222', borderRadius: '12px' }}>VIEW ALL →</button></Link>
           </div>
@@ -380,7 +342,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── PREMIUM FOOTER ── */}
       <footer className="footer-container" style={{ background: '#080808', borderTop: '1px solid #111', padding: '100px 50px 50px' }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto', display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1.5fr', gap: '60px' }} className="footer-grid-mobile">
           <div>
@@ -395,15 +356,15 @@ export default function HomePage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                <Link href="/listings" style={{color: '#555', textDecoration: 'none', fontSize: '14px'}}>All Listings</Link>
                <Link href="/listings?purpose=rent" style={{color: '#555', textDecoration: 'none', fontSize: '14px'}}>Rentals</Link>
-               <Link href="/auth/register" style={{color: '#555', textDecoration: 'none', fontSize: '14px'}}>Sell with us</Link>
+               <Link href="/auth/register" style={{color: '#C9A84C', textDecoration: 'none', fontSize: '14px', fontWeight: 'bold'}}>Join as Agent</Link>
             </div>
           </div>
 
           <div>
             <h4 style={{ fontWeight: 'bold', fontSize: '12px', color: '#fff', marginBottom: '20px', letterSpacing: '2px' }}>LEGAL</h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-               <span style={{color: '#555', fontSize: '14px'}}>Privacy Policy</span>
-               <span style={{color: '#555', fontSize: '14px'}}>Terms of Service</span>
+               <Link href="/legal/privacy" style={{color: '#555', textDecoration: 'none', fontSize: '14px'}}>Privacy Policy</Link>
+               <Link href="/legal/terms" style={{color: '#555', textDecoration: 'none', fontSize: '14px'}}>Terms of Use</Link>
             </div>
           </div>
 
@@ -411,6 +372,7 @@ export default function HomePage() {
             <h4 style={{ fontWeight: 'bold', fontSize: '12px', color: '#fff', marginBottom: '20px', letterSpacing: '2px' }}>CONTACT US</h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                <a href="mailto:info@bettermentgroup.co.ke" style={{ color: '#C9A84C', textDecoration: 'none', fontSize: '14px', fontWeight: 'bold' }}>info@bettermentgroup.co.ke</a>
+               <a href="tel:+254700000000" style={{ color: '#444', textDecoration: 'none', fontSize: '15px' }}>+254 700 000 000</a>
             </div>
           </div>
         </div>
