@@ -59,6 +59,20 @@ export default function RegisterPage() {
     router.push(`/auth/welcome?role=${form.role}&name=${encodeURIComponent(form.full_name)}&new=true`)
   }
 
+   const handleGoogleRegister = async () => {
+  // We append the role to the callback URL so the server knows what it is later
+  const callbackUrl = `${window.location.origin}/auth/callback?role=${form.role}`;
+
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: callbackUrl,
+    },
+  })
+  
+  if (error) alert(error.message)
+}
+
   return (
     <>
       <style>{`
