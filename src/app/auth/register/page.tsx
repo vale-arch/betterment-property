@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -53,25 +54,9 @@ export default function RegisterPage() {
         return 
     }
 
-    // Crucial for clearing cache and showing logged-in state immediately
     router.refresh() 
-    
     router.push(`/auth/welcome?role=${form.role}&name=${encodeURIComponent(form.full_name)}&new=true`)
   }
-
-   const handleGoogleRegister = async () => {
-  // We append the role to the callback URL so the server knows what it is later
-  const callbackUrl = `${window.location.origin}/auth/callback?role=${form.role}`;
-
-  const { error } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: {
-      redirectTo: callbackUrl,
-    },
-  })
-  
-  if (error) alert(error.message)
-}
 
   return (
     <>
@@ -80,18 +65,22 @@ export default function RegisterPage() {
         
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         
+        :root {
+          --terracotta: #A3432F;
+          --gold: #C9A84C;
+          --bone: #FDFCF9;
+          --charcoal: #1A1A1A;
+        }
+
         body { 
             font-family: 'Outfit', sans-serif; 
-            background: #0c0c0c; 
-            color: #fff; 
+            background: var(--bone); 
+            color: var(--charcoal); 
             min-height: 100vh; 
         }
 
-        /* --- Animations --- */
         @keyframes fadeUp { from { opacity:0; transform:translateY(30px); } to { opacity:1; transform:translateY(0); } }
-        @keyframes shimmer { 0% { background-position:-200% center; } 100% { background-position:200% center; } }
 
-        /* --- Layout Containers --- */
         .auth-container {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -100,13 +89,14 @@ export default function RegisterPage() {
         }
 
         .branding-section {
-            background: linear-gradient(160deg,#1a1200,#0c0c0c);
+            background: linear-gradient(160deg, #F9F7F2 0%, #FFFFFF 100%);
             position: relative;
             overflow: hidden;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            padding: 48px;
+            padding: 60px;
+            border-right: 1px solid #EEE;
         }
 
         .form-section {
@@ -114,172 +104,161 @@ export default function RegisterPage() {
             flex-direction: column;
             justify-content: center;
             padding: 60px 80px;
-            background: #0f0f0f;
+            background: #FFFFFF;
             overflow-y: auto;
             animation: fadeUp 0.7s ease both;
         }
 
         .form-wrapper {
-            maxWidth: 440px;
+            max-width: 460px;
             width: 100%;
             margin: 0 auto;
         }
 
-        /* --- Inputs & UI --- */
         .auth-input { 
             width:100%; 
-            background:rgba(255,255,255,0.06); 
-            border:1.5px solid rgba(255,255,255,0.1); 
-            border-radius:12px; 
+            background: #F9F9F9; 
+            border:1.5px solid #EEE; 
+            border-radius:14px; 
             padding:14px 16px; 
-            color:#fff; 
+            color: var(--charcoal); 
             font-family:'Outfit',sans-serif; 
             font-size:15px; 
             transition:all 0.2s; 
         }
-        .auth-input:focus { outline:none; border-color:#C9A84C; background:rgba(255,255,255,0.08); }
+        .auth-input:focus { outline:none; border-color: var(--terracotta); background: #FFF; box-shadow: 0 0 0 4px rgba(163, 67, 47, 0.05); }
         
-        .role-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .role-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 25px; }
         
         .role-card { 
-            border-radius:14px; 
-            border:2px solid rgba(255,255,255,0.08); 
-            padding:18px 20px; 
+            border-radius:16px; 
+            border:1px solid #EEE; 
+            padding:20px; 
             cursor:pointer; 
-            transition:all 0.25s; 
-            background:rgba(255,255,255,0.03); 
+            transition:all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+            background: #FFF; 
             display:flex; 
-            align-items:center; 
-            gap:14px; 
+            flex-direction: column;
+            align-items: center; 
+            text-align: center;
+            gap:10px; 
         }
-        .role-card.active { border-color:#C9A84C; background:rgba(201,168,76,0.08); }
+        .role-card:hover { border-color: var(--gold); transform: translateY(-2px); }
+        .role-card.active { border-color: var(--terracotta); background: rgba(163, 67, 47, 0.03); transform: scale(1.02); }
+        .role-card b { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; }
 
-        .btn-gold { 
-            background:#C9A84C; 
-            color:#0c0c0c; 
+        .btn-prime { 
+            background: var(--terracotta); 
+            color: #FFF; 
             border:none; 
-            border-radius:12px; 
-            padding:15px; 
+            border-radius:100px; 
+            padding:16px; 
             width:100%; 
             font-weight:700; 
+            text-transform: uppercase;
+            letter-spacing: 1px;
             cursor:pointer; 
             transition:all 0.25s; 
+            box-shadow: 0 10px 20px rgba(163, 67, 47, 0.2);
         }
-        .btn-gold:hover { background:#E8C97A; transform:translateY(-2px); }
+        .btn-prime:hover { background:#8E3A26; transform:translateY(-2px); }
 
-        .label { color:rgba(255,255,255,0.5); font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.1em; margin-bottom:8px; display:block; }
+        .label { color: #999; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px; display:block; }
 
         .responsive-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 12px;
-        }
-
-        /* --- MOBILE RESPONSIVENESS --- */
-        @media (max-width: 1024px) {
-            .form-section { padding: 48px 40px; }
+            gap: 15px;
         }
 
         @media (max-width: 850px) {
-            .auth-container {
-                grid-template-columns: 1fr; /* Stack vertically */
-            }
-            .branding-section {
-                padding: 40px 24px;
-                min-height: 350px;
-                justify-content: flex-start;
-                gap: 40px;
-            }
-            .form-section {
-                padding: 40px 20px;
-            }
-            .responsive-grid {
-                grid-template-columns: 1fr; /* Stack inputs */
-            }
-            .bg-text { display: none; } /* Hide large back text on mobile */
+            .auth-container { grid-template-columns: 1fr; }
+            .branding-section { min-height: auto; padding: 40px 24px; border-right: none; border-bottom: 1px solid #EEE; }
+            .form-section { padding: 48px 20px; }
+            .responsive-grid { grid-template-columns: 1fr; }
+            .bg-text { display: none; }
         }
       `}</style>
 
       <div className="auth-container">
 
-        {/* Left — Branding */}
+        {/* Left — Branding Panel */}
         <div className="branding-section">
-          {/* Background Image/Overlay */}
-          <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=1000&q=80)`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: 0.12 }} />
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(160deg,rgba(26,18,0,0.95),rgba(12,12,12,0.85))' }} />
-          
-          <div className="bg-text" style={{ position: 'absolute', bottom: '-20px', left: '-10px', fontFamily: 'Bebas Neue, sans-serif', fontSize: '180px', color: 'rgba(255,255,255,0.025)', lineHeight: 1, pointerEvents: 'none', letterSpacing: '-0.03em', userSelect: 'none' }}>JOIN<br />US</div>
+          <div style={{ position: 'absolute', top: '-5%', left: '-5%', width: '300px', height: '300px', border: '2px solid var(--gold)', borderRadius: '100%', opacity: 0.05 }} />
 
-          {/* Logo */}
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ width: '40px', height: '40px', background: 'linear-gradient(135deg,#C9A84C,#E8C97A)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Bebas Neue, sans-serif', fontSize: '22px', color: '#0c0c0c', boxShadow: '0 0 24px rgba(201,168,76,0.5)' }}>B</div>
+          {/* Logo Component */}
+          <Link href="/" style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none' }}>
+             <svg width="50" height="50" viewBox="0 0 100 100" fill="none">
+                <path d="M20 55 C 20 20, 80 20, 80 55" stroke="#C9A84C" strokeWidth="3" fill="none" />
+                <path d="M25 65 L40 50 L55 65 V80 H25 V65Z" fill="#A3432F" />
+                <path d="M40 55 L55 40 L70 55 V80 H40 V55Z" fill="#A3432F" />
+                <path d="M55 65 L65 55 L75 65 V80 H55 V65Z" fill="#A3432F" />
+                <circle cx="50" cy="72" r="3" fill="#222" />
+                <circle cx="45" cy="74" r="2.5" fill="#222" />
+                <circle cx="55" cy="74" r="2.5" fill="#222" />
+             </svg>
             <div>
-              <div style={{ color: '#fff', fontFamily: 'Bebas Neue, sans-serif', fontSize: '18px', letterSpacing: '0.02em' }}>Betterment Group</div>
-              <div style={{ color: '#C9A84C', fontSize: '9px', letterSpacing: '0.2em', textTransform: 'uppercase', fontWeight: 600 }}>Property</div>
+              <div style={{ color: 'var(--charcoal)', fontFamily: 'Bebas Neue', fontSize: '1.8rem', lineHeight: 1 }}>Betterment Group</div>
+              <div style={{ color: 'var(--gold)', fontSize: '9px', letterSpacing: '2px', textTransform: 'uppercase', fontWeight: 900 }}>Property</div>
             </div>
-          </div>
+          </Link>
 
-          <div style={{ position: 'relative' }}>
-            <h2 style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(2.5rem, 5vw, 4rem)', color: '#fff', lineHeight: 0.95, letterSpacing: '-0.01em', marginBottom: '16px' }}>
-              Join Kenya's<br />Fastest<br />Growing<br />
-              <span style={{ background: 'linear-gradient(135deg,#C9A84C,#E8C97A)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', animation: 'shimmer 4s linear infinite', backgroundSize: '200% auto' }}>Property</span><br />Platform
+          <div style={{ position: 'relative', marginTop: '40px' }}>
+            <h2 style={{ fontFamily: 'Bebas Neue', fontSize: 'clamp(3rem, 5vw, 5rem)', color: 'var(--charcoal)', lineHeight: 0.95, letterSpacing: '-1px', marginBottom: '20px' }}>
+              JOIN KENYA'S<br /><span style={{ color: 'var(--terracotta)' }}>MOST TRUSTED</span><br />PROPERTY HUB
             </h2>
-            <p style={{ color: 'rgba(255,255,255,0.42)', fontSize: '15px', lineHeight: 1.75, maxWidth: '320px' }}>
-                Secure your future with verified listings across all 47 counties.
+            <p style={{ color: '#888', fontSize: '16px', lineHeight: 1.6, maxWidth: '350px', fontWeight: 500 }}>
+                Start your journey with a verified account and access premium listings across the country.
             </p>
           </div>
 
-          <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {['✅ Free to join', '🏠 3,500+ listings', '⚡ Direct contact'].map(p => (
-              <div key={p} style={{ color: 'rgba(255,255,255,0.55)', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>{p}</div>
+          <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {['✓ Verified Agent Network', '✓ High-Performance Listings', '✓ Direct Buyer Connection'].map(p => (
+              <div key={p} style={{ color: '#666', fontSize: '12px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>{p}</div>
             ))}
           </div>
         </div>
 
-        {/* Right — Form */}
+        {/* Right — Form Section */}
         <div className="form-section">
           <div className="form-wrapper">
 
-            <h1 style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: '2.8rem', color: '#fff', marginBottom: '6px' }}>Create Account</h1>
-            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '15px', marginBottom: '32px' }}>
-              Already have an account? <a href="/auth/login" style={{ color: '#C9A84C', textDecoration: 'none', fontWeight: 600 }}>Sign in</a>
+            <h1 style={{ fontFamily: 'Bebas Neue', fontSize: '3rem', color: 'var(--charcoal)', marginBottom: '8px', lineHeight: 1 }}>Create Account</h1>
+            <p style={{ color: '#888', fontSize: '15px', marginBottom: '32px', fontWeight: 500 }}>
+              Already part of the group? <Link href="/auth/login" style={{ color: 'var(--terracotta)', textDecoration: 'none', fontWeight: 700 }}>Sign in</Link>
             </p>
 
             {error && (
-              <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '10px', padding: '12px 16px', marginBottom: '20px', color: '#FCA5A5', fontSize: '14px' }}>
+              <div style={{ background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '12px', padding: '14px', marginBottom: '25px', color: '#EF4444', fontSize: '14px', fontWeight: 600 }}>
                 ⚠️ {error}
               </div>
             )}
 
-            {/* Role selector */}
-            <div style={{ marginBottom: '24px' }}>
-              <label className="label">I want to</label>
+            {/* Role Selector */}
+            <div style={{ marginBottom: '30px' }}>
+              <label className="label">Your Main Goal</label>
               <div className="role-grid">
                 <div className={`role-card ${form.role === 'buyer' ? 'active' : ''}`} onClick={() => set('role', 'buyer')}>
-                  <span style={{ fontSize: '22px' }}>🏠</span>
-                  <div>
-                    <div style={{ color: '#fff', fontWeight: 700, fontSize: '13px' }}>Buy/Rent</div>
-                  </div>
+                  <span style={{ fontSize: '24px' }}>🏡</span>
+                  <b>Browse & Buy</b>
                 </div>
                 <div className={`role-card ${form.role === 'agent' ? 'active' : ''}`} onClick={() => set('role', 'agent')}>
-                  <span style={{ fontSize: '22px' }}>🏗️</span>
-                  <div>
-                    <div style={{ color: '#fff', fontWeight: 700, fontSize: '13px' }}>List Property</div>
-                  </div>
+                  <span style={{ fontSize: '24px' }}>🏗️</span>
+                  <b>List & Sell</b>
                 </div>
               </div>
             </div>
 
-            {/* Fields */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
+            {/* Registration Fields */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: '30px' }}>
               <div className="responsive-grid">
                 <div>
-                  <label className="label">Full Name *</label>
-                  <input className="auth-input" placeholder="John Kamau" value={form.full_name} onChange={e => set('full_name', e.target.value)} />
+                  <label className="label">Full Legal Name *</label>
+                  <input className="auth-input" placeholder="e.g. John Kamau" value={form.full_name} onChange={e => set('full_name', e.target.value)} />
                 </div>
                 <div>
-                  <label className="label">Phone</label>
-                  <input className="auth-input" placeholder="+254..." value={form.phone} onChange={e => set('phone', e.target.value)} />
+                  <label className="label">Phone Number</label>
+                  <input className="auth-input" placeholder="254..." value={form.phone} onChange={e => set('phone', e.target.value)} />
                 </div>
               </div>
 
@@ -290,30 +269,30 @@ export default function RegisterPage() {
 
               {form.role === 'agent' && (
                 <div style={{ animation: 'fadeUp 0.3s ease both' }}>
-                  <label className="label">Agency Name *</label>
-                  <input className="auth-input" placeholder="Kamau Properties Ltd" value={form.agency_name} onChange={e => set('agency_name', e.target.value)} />
+                  <label className="label">Agency / Brand Name *</label>
+                  <input className="auth-input" placeholder="e.g. Savannah Real Estate" value={form.agency_name} onChange={e => set('agency_name', e.target.value)} />
                 </div>
               )}
 
               <div className="responsive-grid">
                 <div>
-                  <label className="label">Password *</label>
+                  <label className="label">Create Password *</label>
                   <div style={{ position: 'relative' }}>
                     <input className="auth-input" type={showPass ? 'text' : 'password'} placeholder="••••••" value={form.password} onChange={e => set('password', e.target.value)} />
-                    <button onClick={() => setShowPass(!showPass)} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', cursor: 'pointer' }}>
+                    <button onClick={() => setShowPass(!showPass)} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#AAA', cursor: 'pointer', fontSize: '18px' }}>
                       {showPass ? '🙈' : '👁️'}
                     </button>
                   </div>
                 </div>
                 <div>
-                  <label className="label">Confirm *</label>
+                  <label className="label">Confirm Password *</label>
                   <input className="auth-input" type="password" placeholder="••••••" value={form.confirm} onChange={e => set('confirm', e.target.value)} />
                 </div>
               </div>
             </div>
 
-            <button className="btn-gold" onClick={handleRegister} disabled={loading}>
-              {loading ? 'Processing...' : `Create ${form.role === 'agent' ? 'Agent' : 'Buyer'} Account →`}
+            <button className="btn-prime" onClick={handleRegister} disabled={loading}>
+              {loading ? 'PROCESSING...' : `START AS ${form.role.toUpperCase()} →`}
             </button>
           </div>
         </div>

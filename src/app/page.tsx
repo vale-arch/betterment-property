@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -9,16 +9,10 @@ export default function HomePage() {
   const router = useRouter()
   const supabase = createClient()
 
-  // --- UI & Animation States ---
+  // --- States ---
   const [purpose, setPurpose] = useState('sale')
   const [scrolled, setScrolled] = useState(false)
-  const [heroLoaded, setHeroLoaded] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
-  const [visible, setVisible] = useState<Record<string, boolean>>({})
-  const obsRefs = useRef<Record<string, HTMLElement | null>>({})
-
-  // --- Data & Auth States ---
   const [user, setUser] = useState<any>(null)
   const [mounted, setMounted] = useState(false)
   const [realListings, setRealListings] = useState<any[]>([])
@@ -26,11 +20,14 @@ export default function HomePage() {
 
   useEffect(() => {
     setMounted(true)
+    
+    // Auth Listener
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       setUser(user)
     }
     checkUser()
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
     })
@@ -42,48 +39,31 @@ export default function HomePage() {
   const fetchLatestListings = async () => {
     const { data } = await supabase
       .from('properties')
-      .select('*, property_images(url)')
+      .select('*, property_images(url), counties(name), sub_counties(name)')
       .eq('listing_status', 'active')
       .limit(6)
       .order('created_at', { ascending: false })
-
     if (data) setRealListings(data)
   }
 
+  // --- AUTO-CLOSE ON SCROLL LOGIC ---
   useEffect(() => {
     const onScroll = () => {
-        setScrolled(window.scrollY > 50)
-        if (window.scrollY > 100 && menuOpen) setMenuOpen(false)
+        setScrolled(window.scrollY > 40)
+        // If user scrolls more than 50px while menu is open, close it
+        if (window.scrollY > 50 && menuOpen) {
+            setMenuOpen(false)
+        }
     }
     window.addEventListener('scroll', onScroll)
     return () => window.removeEventListener('scroll', onScroll)
-  }, [menuOpen])
+  }, [menuOpen]) // Dependency added to track menu state
 
-  useEffect(() => {
-    const io = new IntersectionObserver(
-      entries => entries.forEach(e => {
-        if (e.isIntersecting) setVisible(p => ({ ...p, [e.target.id]: true }))
-      }),
-      { threshold: 0.1 }
-    )
-    Object.values(obsRefs.current).forEach(el => el && io.observe(el))
-    return () => io.disconnect()
-  }, [realListings])
-
-  const reg = (id: string) => (el: HTMLElement | null) => {
-    if (el) { el.id = id; obsRefs.current[id] = el }
-  }
-
-  const anim = (id: string, delay = 0) => ({
-    opacity: visible[id] ? 1 : 0,
-    transform: visible[id] ? 'translateY(0)' : 'translateY(40px)',
-    transition: `opacity 0.8s cubic-bezier(0.16,1,0.3,1) ${delay}ms, transform 0.8s cubic-bezier(0.16,1,0.3,1) ${delay}ms`,
-  })
-
-  const handleSignOut = async () => { 
+  const handleSignOut = async () => {
     await supabase.auth.signOut()
-    router.refresh()
+    setUser(null)
     setMenuOpen(false)
+    router.refresh()
   }
 
   const handleSearch = () => {
@@ -92,294 +72,224 @@ export default function HomePage() {
 
   if (!mounted) return null
 
+  // --- Reusable Logo Component ---
+  const SavannahLogo = ({ scrolled }: { scrolled: boolean }) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <svg width="40" height="40" viewBox="0 0 100 100" fill="none">
+        <path d="M20 55 C 20 20, 80 20, 80 55" stroke="#C9A84C" strokeWidth="3" fill="none" />
+        <path d="M25 65 L40 50 L55 65 V80 H25 V65Z" fill="#A3432F" />
+        <path d="M40 55 L55 40 L70 55 V80 H40 V55Z" fill="#A3432F" />
+        <path d="M55 65 L65 55 L75 65 V80 H55 V65Z" fill="#A3432F" />
+        <circle cx="50" cy="72" r="3" fill="#222" />
+        <circle cx="45" cy="74" r="2.5" fill="#222" />
+        <circle cx="55" cy="74" r="2.5" fill="#222" />
+      </svg>
+      <div style={{ textAlign: 'left' }}>
+        <div style={{ 
+          fontFamily: 'Bebas Neue', 
+          fontSize: '1.4rem', 
+          lineHeight: 1, 
+          color: scrolled ? '#1A1A1A' : '#FFFFFF' 
+        }}>BETTERMENT GROUP</div>
+        <div style={{ color: '#C9A84C', fontSize: '8px', fontWeight: '900', letterSpacing: '1.5px' }}>PROPERTY</div>
+      </div>
+    </div>
+  )
+
   return (
     <>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&display=swap');
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        html { scroll-behavior: smooth; }
-        body { font-family: 'Outfit', sans-serif; background: #0c0c0c; color: #fff; overflow-x: hidden; }
-
-        @keyframes shimmer { 0% { background-position:-200% center; } 100% { background-position:200% center; } }
-        @keyframes heroImg { from { opacity:0; transform:scale(1.05); } to { opacity:1; transform:scale(1); } }
-        @keyframes ticker { 0% { transform:translateX(0); } 100% { transform:translateX(-50%); } }
-        @keyframes menuSlide { from { opacity:0; transform:translateY(-10px); } to { opacity:1; transform:translateY(0); } }
-
-        .nav-a { color:rgba(255,255,255,0.7); text-decoration:none; font-size:14px; font-weight:500; transition:all 0.2s; }
-        .nav-a:hover { color:#C9A84C; }
-
-        .listing-card { background:#141414; border-radius:24px; overflow:hidden; border:1px solid rgba(255,255,255,0.06); transition:all 0.4s; cursor:pointer; height: 100%; }
-        .listing-card:hover { transform:translateY(-8px); border-color:#C9A84C; box-shadow:0 20px 40px rgba(0,0,0,0.5); }
-        .listing-card img { width:100%; height:240px; object-fit:cover; display:block; transition: 0.5s; }
-        .listing-card:hover img { transform: scale(1.05); }
-
-        .btn { display:inline-flex; align-items:center; gap:8px; border:none; border-radius:14px; padding:12px 24px; font-size:14px; font-weight:600; cursor:pointer; font-family:'Outfit',sans-serif; transition:all 0.2s; }
-        .btn-gold { background:#C9A84C; color:#000; }
-        .btn-gold:hover { background:#E8C97A; transform:translateY(-2px); }
-        .btn-logout { background: transparent; border: none; color: #ff4444; font-weight: 700; cursor: pointer; font-size: 13px; }
-
-        .search-input { background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); border-radius:14px; padding:14px 18px; color:#fff; font-family:'Outfit',sans-serif; width:100%; outline:none; font-size: 15px; }
-        .search-input:focus { border-color:#C9A84C; background:rgba(255,255,255,0.1); }
-
-        .search-card-responsive {
-          background: rgba(12, 12, 12, 0.8);
-          backdrop-filter: blur(20px);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          border-radius: 24px;
-          padding: 24px;
-          width: 100%;
-          max-width: 900px;
-          box-shadow: 0 20px 50px rgba(0,0,0,0.5);
-          margin: 0 auto;
+        
+        :root {
+          --terracotta: #A3432F;
+          --gold: #C9A84C;
+          --charcoal: #1A1A1A;
         }
 
-        .search-layout-grid {
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 16px;
+        body { font-family: 'Outfit', sans-serif; background: #FFF; color: var(--charcoal); margin: 0; }
+
+        /* --- HERO --- */
+        .hero-full {
+          position: relative; height: 100vh; width: 100%;
+          display: flex; align-items: center; justify-content: center;
+          background: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url('https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1600&q=80');
+          background-size: cover; background-position: center;
         }
 
-        @media (min-width: 768px) {
-          .search-layout-grid {
-            grid-template-columns: 2fr 1fr 1fr;
-            align-items: flex-end;
-            gap: 12px;
-          }
-          .input-wrapper { margin-bottom: 0 !important; }
+        .hero-title { font-family: 'Bebas Neue'; font-size: clamp(3rem, 10vw, 7.5rem); color: white; line-height: 0.9; text-align: center; margin-bottom: 30px; }
+
+        /* --- NAV --- */
+        nav { position: fixed; top: 0; width: 100%; z-index: 1000; transition: 0.4s; padding: 20px 0; }
+        .nav-scrolled { background: white; padding: 12px 0; border-bottom: 1px solid #eee; box-shadow: 0 5px 20px rgba(0,0,0,0.05); }
+
+        .desktop-links { display: flex; gap: 30px; align-items: center; }
+        
+        /* --- HAMBURGER --- */
+        .hamburger { display: none; cursor: pointer; flex-direction: column; gap: 6px; background: none; border: none; padding: 10px; }
+        .hamburger div { width: 28px; height: 3px; background: white; transition: 0.3s; }
+        .nav-scrolled .hamburger div { background: #1A1A1A; }
+
+        @media (max-width: 991px) {
+          .desktop-links { display: none !important; }
+          .hamburger { display: flex !important; }
         }
 
-        .input-label-premium {
-          font-size: 10px;
-          font-weight: 800;
-          color: #666;
-          text-transform: uppercase;
-          letter-spacing: 1px;
-          margin-bottom: 8px;
-          display: block;
+        /* --- REFINED OVERLAY --- */
+        .mobile-overlay {
+          position: fixed; top: 0; right: 0; height: 100vh; width: 70%; /* Shrink width */
+          max-width: 320px; background: white;
+          z-index: 2000; display: flex; flex-direction: column; padding: 40px 30px; gap: 20px;
+          transform: translateX(100%); transition: 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+          box-shadow: -10px 0 30px rgba(0,0,0,0.1);
         }
+        .mobile-overlay.open { transform: translateX(0); }
 
-        .dropdown-content {
-          max-height: 0;
-          overflow: hidden;
-          transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          background: #1a1a1a;
-          border-radius: 12px;
-          margin-top: 5px;
-          border: 1px solid rgba(255,255,255,0.05);
-          position: absolute;
-          width: 100%;
-          z-index: 50;
+        /* --- SEARCH --- */
+        .search-v5 {
+          background: white; padding: 20px; border-radius: 24px;
+          max-width: 900px; width: 90%; display: flex; flex-direction: column; gap: 15px;
+          box-shadow: 0 30px 60px rgba(0,0,0,0.3);
         }
-        .dropdown-content.open { max-height: 200px; padding: 5px 0; }
-        .dropdown-item {
-          padding: 12px 18px;
-          cursor: pointer;
-          font-size: 14px;
-          transition: background 0.2s;
-        }
-        .dropdown-item:hover { background: rgba(201,168,76,0.1); color: #C9A84C; }
+        @media (min-width: 992px) { .search-v5 { flex-direction: row; border-radius: 100px; padding: 10px; } }
 
-        @media (max-width: 768px) {
-          .nav-container { padding: 0 20px !important; }
-          .desktop-nav { display:none !important; }
-          .mobile-btn { display:flex !important; align-items: center; justify-content: center; }
-          .hero-section { padding: 0 20px !important; text-align: center; justify-content: center !important; }
-          .hero-title { font-size: 3.5rem !important; margin-bottom: 20px !important; line-height: 1.1 !important; }
-          .section-pad { padding: 60px 20px !important; }
-          .listings-grid { grid-template-columns: 1fr !important; gap: 20px !important; }
-          .footer-container { padding: 40px 20px !important; }
-          .footer-grid-mobile { grid-template-columns: 1fr !important; text-align: center; gap: 40px !important; }
+        .type-selector { display: flex; background: #f8f8f8; border-radius: 100px; padding: 5px; gap: 5px; }
+        .type-btn { 
+          flex: 1; padding: 12px 10px; border-radius: 100px; border: none; background: transparent; 
+          font-family: 'Outfit'; font-weight: 700; font-size: 11px; cursor: pointer; transition: 0.4s;
         }
+        .type-btn.active { background: var(--terracotta); color: white; }
+
+        .btn-action { background: var(--terracotta); color: white; border: none; padding: 14px 30px; border-radius: 100px; font-weight: 700; cursor: pointer; transition: 0.3s; text-decoration: none; display: inline-block; text-align: center; }
+
+        /* --- TICKER --- */
+        .ticker { background: var(--gold); padding: 15px 0; color: white; font-weight: 800; font-size: 11px; overflow: hidden; white-space: nowrap; }
+        .ticker-inner { display: inline-block; animation: tick 40s linear infinite; }
+        @keyframes tick { from { transform: translateX(0); } to { transform: translateX(-50%); } }
       `}</style>
 
-      {/* ── NAVBAR ── */}
-      <nav style={{
-        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 1000, height: '72px',
-        display: 'flex', alignItems: 'center',
-        background: scrolled ? 'rgba(12,12,12,0.96)' : 'transparent',
-        backdropFilter: scrolled ? 'blur(20px)' : 'none',
-        borderBottom: scrolled ? '1px solid rgba(255,255,255,0.08)' : 'none',
-        transition: '0.4s ease'
-      }}>
-        <div className="nav-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '0 50px' }}>
-          <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
-            <div style={{ width: '36px', height: '36px', background: '#C9A84C', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Bebas Neue', fontSize: '20px', color: '#000' }}>B</div>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ color: '#fff', fontFamily: 'Bebas Neue', fontSize: '18px', lineHeight: 1 }}>BETTERMENT GROUP</span>
-              <span style={{ color: '#C9A84C', fontSize: '8px', textTransform: 'uppercase', letterSpacing: '2px', fontWeight: 'bold' }}>Property</span>
-            </div>
+      {/* --- MOBILE NAV OVERLAY --- */}
+      <div className={`mobile-overlay ${menuOpen ? 'open' : ''}`}>
+        <button onClick={() => setMenuOpen(false)} style={{ alignSelf: 'flex-end', fontSize: '30px', border: 'none', background: 'none' }}>✕</button>
+        <Link href="/" onClick={() => setMenuOpen(false)} style={{ fontSize: '1.8rem', fontFamily: 'Bebas Neue', textDecoration: 'none', color: '#1A1A1A' }}>Home</Link>
+        <Link href="/listings" onClick={() => setMenuOpen(false)} style={{ fontSize: '1.8rem', fontFamily: 'Bebas Neue', textDecoration: 'none', color: '#1A1A1A' }}>Marketplace</Link>
+        <hr style={{ border: '0.5px solid #eee', width: '100%' }} />
+        {user ? (
+          <>
+            {(user.user_metadata?.role === 'agent' || user.user_metadata?.role === 'admin') && (
+              <Link href="/dashboard" onClick={() => setMenuOpen(false)} style={{ fontSize: '1.2rem', fontWeight: '700', textDecoration: 'none', color: 'var(--terracotta)' }}>Dashboard</Link>
+            )}
+            <button onClick={handleSignOut} style={{ textAlign: 'left', background: 'none', border: 'none', fontSize: '1.2rem', fontWeight: '700', color: 'red', cursor: 'pointer' }}>Sign Out</button>
+          </>
+        ) : (
+          <Link href="/auth/login" onClick={() => setMenuOpen(false)} className="btn-action">SIGN IN</Link>
+        )}
+      </div>
+
+      {/* --- NAV --- */}
+      <nav className={scrolled ? 'nav-scrolled' : ''}>
+        <div style={{ maxWidth: '1300px', margin: '0 auto', padding: '0 25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Link href="/" style={{ textDecoration: 'none' }}>
+            <SavannahLogo scrolled={scrolled} />
           </Link>
 
-          <div className="desktop-nav" style={{ display: 'flex', gap: '30px' }}>
-            <Link href="/listings" className="nav-a">Browse</Link>
-            <Link href="/listings?purpose=rent" className="nav-a">Rentals</Link>
-            <Link href="/listings?type=land" className="nav-a">Land</Link>
-          </div>
-
-          <div className="desktop-nav" style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+          <div className="desktop-links">
+            <Link href="/listings" style={{ textDecoration: 'none', color: scrolled ? '#1A1A1A' : 'white', fontWeight: '600', fontSize: '14px' }}>Marketplace</Link>
             {user ? (
-              <>
-                {(user.user_metadata?.role === 'admin' || user.user_metadata?.role === 'agent') && (
-                  <Link href={user.user_metadata?.role === 'admin' ? '/admin' : '/dashboard'}>
-                    <button className="btn" style={{ background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid #333', padding: '8px 16px', borderRadius: '10px', fontSize: '12px' }}>DASHBOARD</button>
-                  </Link>
+              <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+                {(user.user_metadata?.role === 'agent' || user.user_metadata?.role === 'admin') && (
+                  <Link href="/dashboard" className="btn-action" style={{ padding: '8px 20px', fontSize: '12px' }}>DASHBOARD</Link>
                 )}
-                <button onClick={handleSignOut} className="btn-logout">SIGN OUT</button>
-              </>
+                <button onClick={handleSignOut} style={{ background: 'none', border: 'none', color: scrolled ? '#1A1A1A' : 'white', cursor: 'pointer', fontWeight: '700', fontSize: '12px' }}>SIGN OUT</button>
+              </div>
             ) : (
-              <>
-                <Link href="/auth/login" className="nav-a" style={{ fontSize: '13px' }}>Sign In</Link>
-                <Link href="/auth/register"><button className="btn btn-gold" style={{ padding: '10px 20px', fontSize: '12px', fontWeight: 'bold' }}>LIST PROPERTY</button></Link>
-              </>
+              <Link href="/auth/login" className="btn-action" style={{ padding: '8px 25px', fontSize: '12px' }}>SIGN IN</Link>
             )}
           </div>
 
-          <button className="mobile-btn" onClick={() => setMenuOpen(!menuOpen)} style={{ display: 'none', background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '10px', width: '42px', height: '42px', color: '#C9A84C', cursor: 'pointer' }}>
-            {menuOpen ? '✕' : '☰'}
-          </button>
+          <button className="hamburger" onClick={() => setMenuOpen(true)}> <div /> <div /> <div /> </button>
         </div>
-
-        {menuOpen && (
-          <div style={{ position: 'fixed', inset: 0, top: '72px', background: '#0c0c0c', padding: '40px 20px', display: 'flex', flexDirection: 'column', gap: '25px', zIndex: 999 }}>
-             <Link href="/listings" style={{ fontSize: '24px', fontWeight: 'bold', textDecoration: 'none', color: '#fff' }} onClick={() => setMenuOpen(false)}>Browse All Properties</Link>
-             {user ? (
-               <>
-                 {(user.user_metadata?.role === 'admin' || user.user_metadata?.role === 'agent') && (
-                    <Link href={user.user_metadata?.role === 'admin' ? '/admin' : '/dashboard'} style={{ fontSize: '20px', color: '#C9A84C', textDecoration: 'none' }} onClick={() => setMenuOpen(false)}>Go to Dashboard</Link>
-                 )}
-                 <button onClick={handleSignOut} style={{ textAlign: 'left', fontSize: '18px' }} className="btn-logout">Logout Account</button>
-               </>
-             ) : (
-               <>
-                 <Link href="/auth/login" style={{ fontSize: '20px', color: '#fff', textDecoration: 'none' }} onClick={() => setMenuOpen(false)}>Sign In</Link>
-                 <Link href="/auth/register" onClick={() => setMenuOpen(false)} style={{ background: '#C9A84C', padding: '16px', textAlign: 'center', color: '#000', borderRadius: '14px', fontWeight: 'bold', textDecoration: 'none' }}>List Your Property</Link>
-               </>
-             )}
-          </div>
-        )}
       </nav>
 
-      {/* ── HERO ── */}
-      <section className="hero-section" style={{ height: '100vh', position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 50px', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?w=1800&q=85)`, backgroundSize: 'cover', backgroundPosition: 'center', animation: 'heroImg 1.5s ease both', zIndex: -1 }} />
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, #0c0c0c 10%, transparent 80%), linear-gradient(to right, rgba(0,0,0,0.7) 0%, transparent 100%)', zIndex: -1 }} />
+      {/* --- HERO --- */}
+      <section className="hero-full">
+        <div style={{ zIndex: 10, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <h1 className="hero-title"> FIND YOUR <br /> <span style={{ color: 'var(--gold)' }}>DREAM HOME</span> <br /> IN KENYA </h1>
 
-        <div style={{ maxWidth: '900px', zIndex: 1, margin: scrolled ? '0' : '0 auto', textAlign: scrolled ? 'left' : 'center' }}>
-          <h1 className="hero-title" style={{ fontFamily: 'Bebas Neue', fontSize: '7rem', lineHeight: 0.85, marginBottom: '30px' }}>
-            Find Your <span style={{ color: '#C9A84C', background: 'linear-gradient(135deg,#C9A84C,#F0D98A)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', animation: 'shimmer 4s linear infinite', backgroundSize: '200%' }}>Dream Home</span> in Kenya
-          </h1>
-
-          <div className="search-card-responsive">
-            <div className="search-layout-grid">
-              
-              <div className="input-wrapper">
-                <label className="input-label-premium">Where are you looking?</label>
-                <div style={{ position: 'relative' }}>
-                  <span style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', opacity: 0.5 }}>📍</span>
-                  <input className="search-input" placeholder="e.g. Karen, Nairobi..." style={{ paddingLeft: '44px', height: '54px' }} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
-                </div>
-              </div>
-
-              <div className="input-wrapper" style={{ position: 'relative' }}>
-                <label className="input-label-premium">Purpose</label>
-                <div className="search-input" onClick={() => setIsDropdownOpen(!isDropdownOpen)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', height: '54px' }}>
-                  <span>{purpose === 'sale' ? 'Buy House' : purpose === 'rent' ? 'Rent House' : 'Buy Land'}</span>
-                  <span style={{ color: '#C9A84C', transform: isDropdownOpen ? 'rotate(180deg)' : 'none', transition: '0.3s' }}>▼</span>
-                </div>
-                <div className={`dropdown-content ${isDropdownOpen ? 'open' : ''}`}>
-                  <div className="dropdown-item" onClick={() => { setPurpose('sale'); setIsDropdownOpen(false); }}>Buy House</div>
-                  <div className="dropdown-item" onClick={() => { setPurpose('rent'); setIsDropdownOpen(false); }}>Rent House</div>
-                  <div className="dropdown-item" onClick={() => { setPurpose('land'); setIsDropdownOpen(false); }}>Buy Land</div>
-                </div>
-              </div>
-
-              <button onClick={handleSearch} className="btn btn-gold" style={{ height: '54px', fontWeight: '800', width: '100%' }}>SEARCH</button>
+          <div className="search-v5">
+            <div style={{ flex: 1, padding: '0 10px' }}>
+              <label style={{ fontSize: '9px', fontWeight: '900', color: '#999', display: 'block', marginBottom: '5px' }}>LOCATION</label>
+              <input placeholder="Karen, Runda, Nyali..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ border: 'none', outline: 'none', width: '100%', fontSize: '15px', fontWeight: '600' }} />
             </div>
+            <div className="type-selector">
+              <button className={`type-btn ${purpose === 'sale' ? 'active' : ''}`} onClick={() => setPurpose('sale')}>BUY</button>
+              <button className={`type-btn ${purpose === 'rent' ? 'active' : ''}`} onClick={() => setPurpose('rent')}>RENT</button>
+              <button className={`type-btn ${purpose === 'land' ? 'active' : ''}`} onClick={() => setPurpose('land')}>LAND</button>
+            </div>
+            <button onClick={handleSearch} className="btn-action">SEARCH</button>
           </div>
         </div>
       </section>
 
-      <div style={{ background: '#C9A84C', padding: '12px 0', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-        <div style={{ display: 'inline-block', animation: 'ticker 25s linear infinite' }}>
-          {[...Array(10)].map((_, i) => (
-            <span key={i} style={{ color: '#000', fontWeight: '900', padding: '0 40px', fontSize: '12px' }}>VERIFIED LISTINGS • ALL 47 COUNTIES • ZERO SCAMS • BETTERMENT GROUP PROPERTY •</span>
+      {/* --- TICKER --- */}
+      <div className="ticker">
+        <div className="ticker-inner">
+          {[...Array(8)].map((_, i) => (
+            <span key={i} style={{ padding: '0 50px' }}>VERIFIED LISTINGS • ZERO FRAUD • ALL 47 COUNTIES • PREMIUM QUALITY • BETTERMENT GROUP PROPERTY •</span>
           ))}
         </div>
       </div>
 
-      <section className="section-pad" style={{ padding: '100px 50px' }}>
-        <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-          <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '50px' }}>
-            <div>
-               <h2 style={{ fontFamily: 'Bebas Neue', fontSize: '4.5rem', lineHeight: 1 }}>Recent <span style={{ color: '#C9A84C' }}>Uploads</span></h2>
-               <p style={{ color: '#555', marginTop: '10px' }}>Explore the newest verified properties on the market today.</p>
-            </div>
-            <Link href="/listings"><button className="btn" style={{ background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid #222', borderRadius: '12px' }}>VIEW ALL →</button></Link>
+      {/* --- RECENT OFFERS --- */}
+      <section style={{ padding: '80px 20px', background: '#FDFDFD' }}>
+        <div style={{ maxWidth: '1300px', margin: '0 auto' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '40px', gap: '15px' }}>
+             <h2 style={{ fontFamily: 'Bebas Neue', fontSize: '3.5rem', margin: 0 }}>Recent <span style={{ color: 'var(--terracotta)' }}>Offers</span></h2>
+             <Link href="/listings" style={{ color: 'var(--terracotta)', fontWeight: '800', textDecoration: 'none', fontSize: '13px' }}>VIEW ALL PROPERTIES →</Link>
           </div>
 
-          <div className="listings-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '30px' }}>
-            {realListings.length > 0 ? realListings.map((p, i) => (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '30px' }}>
+            {realListings.map((p) => (
               <Link href={`/properties/${p.id}`} key={p.id} style={{ textDecoration: 'none' }}>
-                <div className="listing-card" ref={reg(`card-${i}`)} style={{ ...anim(`card-${i}`, i * 100) }}>
-                  <div style={{ position: 'relative', overflow: 'hidden' }}>
-                     <img src={p.property_images?.[0]?.url || 'https://via.placeholder.com/600x400?text=No+Photo'} alt={p.title} />
-                     <div style={{ position: 'absolute', top: '15px', left: '15px', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)', color: '#fff', padding: '5px 12px', borderRadius: '8px', fontSize: '10px', fontWeight: 'bold' }}>{p.property_type.toUpperCase()}</div>
-                  </div>
+                <div style={{ background: 'white', borderRadius: '30px', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.03)', transition: '0.4s' }}>
+                  <img src={p.property_images?.[0]?.url} style={{ width: '100%', height: '240px', objectFit: 'cover' }} />
                   <div style={{ padding: '25px' }}>
-                    <div style={{ color: '#C9A84C', fontWeight: '800', fontSize: '22px', fontFamily: 'Bebas Neue' }}>KES {p.price?.toLocaleString()}</div>
-                    <h3 style={{ color: '#fff', fontSize: '18px', fontWeight: '600', marginTop: '5px' }}>{p.title}</h3>
-                    <div style={{ marginTop: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                       <span style={{ fontSize: '12px', color: '#444' }}>{p.listing_purpose === 'sale' ? 'For Sale' : 'For Rent'}</span>
-                       <span style={{ color: '#C9A84C', fontSize: '12px', fontWeight: 'bold' }}>VIEW DETAILS →</span>
-                    </div>
+                    <div style={{ color: 'var(--gold)', fontFamily: 'Bebas Neue', fontSize: '1.6rem' }}>KES {p.price?.toLocaleString()}</div>
+                    <div style={{ fontWeight: '700', fontSize: '1.1rem', margin: '5px 0', color: '#222' }}>{p.title}</div>
+                    <div style={{ color: '#999', fontSize: '13px' }}>📍 {p.sub_counties?.name}, {p.counties?.name}</div>
                   </div>
                 </div>
               </Link>
-            )) : (
-              <p style={{ color: '#444', gridColumn: '1/-1', textAlign: 'center', padding: '50px' }}>Searching for verified properties...</p>
-            )}
+            ))}
           </div>
         </div>
       </section>
 
-      <footer className="footer-container" style={{ background: '#080808', borderTop: '1px solid #111', padding: '100px 50px 50px' }}>
-        <div style={{ maxWidth: '1400px', margin: '0 auto', display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1.5fr', gap: '60px' }} className="footer-grid-mobile">
-          <div>
-            <h3 style={{ fontFamily: 'Bebas Neue', fontSize: '28px', color: '#C9A84C', marginBottom: '20px' }}>BETTERMENT GROUP</h3>
-            <p style={{ color: '#555', fontSize: '14px', lineHeight: 1.8, maxWidth: '350px' }}>
-              Kenya's fastest-growing property platform. We connect serious buyers with verified agents to create a transparent real estate market.
-            </p>
-          </div>
-          
-          <div>
-            <h4 style={{ fontWeight: 'bold', fontSize: '12px', color: '#fff', marginBottom: '20px', letterSpacing: '2px' }}>EXPLORE</h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-               <Link href="/listings" style={{color: '#555', textDecoration: 'none', fontSize: '14px'}}>All Listings</Link>
-               <Link href="/listings?purpose=rent" style={{color: '#555', textDecoration: 'none', fontSize: '14px'}}>Rentals</Link>
-               <Link href="/auth/register" style={{color: '#C9A84C', textDecoration: 'none', fontSize: '14px', fontWeight: 'bold'}}>Join as Agent</Link>
-            </div>
-          </div>
+      {/* --- WHY BETTERMENT --- */}
+      <section style={{ padding: '80px 20px', textAlign: 'center', maxWidth: '1200px', margin: '0 auto' }}>
+        <h2 style={{ fontFamily: 'Bebas Neue', fontSize: '3.5rem', marginBottom: '20px' }}>Why <span style={{ color: 'var(--terracotta)' }}>Betterment Group</span>?</h2>
+        <p style={{ color: '#666', maxWidth: '750px', margin: '0 auto', fontSize: '1.1rem', lineHeight: 1.6 }}>
+          The standard for Kenyan Real Estate. Verified listings, direct agent communication, and premium transparency.
+        </p>
+      </section>
 
+      {/* --- FOOTER --- */}
+      <footer style={{ background: '#111', color: 'white', padding: '80px 20px 40px' }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '50px' }}>
           <div>
-            <h4 style={{ fontWeight: 'bold', fontSize: '12px', color: '#fff', marginBottom: '20px', letterSpacing: '2px' }}>LEGAL</h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-               <Link href="/legal/privacy" style={{color: '#555', textDecoration: 'none', fontSize: '14px'}}>Privacy Policy</Link>
-               <Link href="/legal/terms" style={{color: '#555', textDecoration: 'none', fontSize: '14px'}}>Terms of Use</Link>
-            </div>
+             <Link href="/" style={{ textDecoration: 'none' }}><SavannahLogo scrolled={false} /></Link>
+             <p style={{ color: '#666', fontSize: '13px', marginTop: '15px' }}>The premium standard for Kenyan Real Estate.</p>
           </div>
-
           <div>
-            <h4 style={{ fontWeight: 'bold', fontSize: '12px', color: '#fff', marginBottom: '20px', letterSpacing: '2px' }}>CONTACT US</h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-               <a href="mailto:info@bettermentgroup.co.ke" style={{ color: '#C9A84C', textDecoration: 'none', fontSize: '14px', fontWeight: 'bold' }}>info@bettermentgroup.co.ke</a>
-               <a href="tel:+254700000000" style={{ color: '#444', textDecoration: 'none', fontSize: '15px' }}>+254 700 000 000</a>
-            </div>
+             <h4 style={{ fontFamily: 'Bebas Neue', fontSize: '1.5rem', marginBottom: '15px', color: 'var(--gold)' }}>COMPANY</h4>
+             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '14px', color: '#888' }}>
+                <Link href="/listings" style={{ color: 'inherit', textDecoration: 'none' }}>Marketplace</Link>
+                <Link href="/auth/register" style={{ color: 'var(--gold)', textDecoration: 'none', fontWeight: 'bold' }}>Join as Agent</Link>
+             </div>
           </div>
         </div>
-
-        <div style={{ maxWidth: '1400px', margin: '60px auto 0', paddingTop: '30px', borderTop: '1px solid #111', color: '#333', fontSize: '12px', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '20px' }}>
-          <span>© 2026 BETTERMENT GROUP PROPERTY LIMITED. ALL RIGHTS RESERVED.</span>
-          <span style={{ color: '#C9A84C', fontWeight: 'bold' }}>MADE IN KENYA 🇰🇪</span>
+        <div style={{ textAlign: 'center', marginTop: '60px', borderTop: '1px solid #222', paddingTop: '20px', color: '#444', fontSize: '10px' }}>
+          © 2026 BETTERMENT GROUP PROPERTY. MADE IN KENYA 🇰🇪
         </div>
       </footer>
     </>
