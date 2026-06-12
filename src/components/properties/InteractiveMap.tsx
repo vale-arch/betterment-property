@@ -1,5 +1,8 @@
-'use client'
+"use client"
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+// TypeScript may complain about side-effect CSS imports if no declaration exists for the module.
+// Suppress the error for this import since it's a stylesheet used at runtime.
+// @ts-ignore
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { useState } from 'react';
