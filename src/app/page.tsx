@@ -8,6 +8,8 @@ import SearchPill from '@/components/home/SearchPill';
 import RollingShowcase from '@/components/home/RollingShowcase';
 import MarketTicker from '@/components/home/MarketTicker'; 
 import SimilarProperties from '@/components/properties/SimilarProperties';
+import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import NotFound from './not-found'
 
 export const dynamic = 'force-dynamic'
 
