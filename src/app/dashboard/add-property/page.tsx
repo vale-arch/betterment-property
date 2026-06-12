@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { motion, AnimatePresence } from 'framer-motion'
 
 export default function AddPropertyPage() {
   const router = useRouter()
@@ -13,10 +14,11 @@ export default function AddPropertyPage() {
   const [loading, setLoading] = useState(false)
   const [counties, setCounties] = useState<any[]>([])
   const [subCounties, setSubCounties] = useState<any[]>([])
+  const [availableAmenities, setAvailableAmenities] = useState<any[]>([])
+  const [selectedAmenities, setSelectedAmenities] = useState<string[]>([])
   const [images, setImages] = useState<File[]>([])
   const [previews, setPreviews] = useState<string[]>([])
   
-  // UI States for Animations
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null)
 
   const [form, setForm] = useState({
@@ -27,24 +29,23 @@ export default function AddPropertyPage() {
     price: '',
     county_id: '',
     sub_county_id: '',
-    bedrooms: '',
-    bathrooms: '',
+    total_rooms: '', // Combined field
     sqft: ''
   })
 
-  // Close dropdowns when clicking outside
   useEffect(() => {
     const closeAll = () => setActiveDropdown(null)
     window.addEventListener('click', closeAll)
-    return () => window.removeEventListener('click', closeAll)
-  }, [])
+    
+    async function fetchData() {
+      const { data: cData } = await supabase.from('counties').select('*').order('name')
+      if (cData) setCounties(cData)
 
-  useEffect(() => {
-    async function getCounties() {
-      const { data } = await supabase.from('counties').select('*').order('name')
-      if (data) setCounties(data)
+      const { data: aData } = await supabase.from('amenities').select('*').order('name')
+      if (aData) setAvailableAmenities(aData)
     }
-    getCounties()
+    fetchData()
+    return () => window.removeEventListener('click', closeAll)
   }, [])
 
   useEffect(() => {
@@ -60,6 +61,12 @@ export default function AddPropertyPage() {
     getSubCounties()
   }, [form.county_id])
 
+  const toggleAmenity = (name: string) => {
+    setSelectedAmenities(prev => 
+      prev.includes(name) ? prev.filter(a => a !== name) : [...prev, name]
+    )
+  }
+
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const files = Array.from(e.target.files)
@@ -71,8 +78,8 @@ export default function AddPropertyPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.county_id || !form.sub_county_id) {
-        alert("Please select both County and Sub-County")
+    if (!form.county_id) {
+        alert("Please select a County (Required)")
         return
     }
     setLoading(true)
@@ -81,19 +88,21 @@ export default function AddPropertyPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error("Not authenticated")
 
+      const finalDescription = `${form.description}\n\nFeatures: ${selectedAmenities.join(', ')}`
+
       const { data: property, error: pError } = await supabase
         .from('properties')
         .insert([{
           owner_id: user.id,
           title: form.title,
-          description: form.description,
+          description: finalDescription,
           property_type: form.property_type,
           listing_purpose: form.listing_purpose,
           price: parseFloat(form.price),
           county_id: parseInt(form.county_id),
-          sub_county_id: parseInt(form.sub_county_id),
-          bedrooms: form.bedrooms ? parseInt(form.bedrooms) : null,
-          bathrooms: form.bathrooms ? parseInt(form.bathrooms) : null,
+          sub_county_id: form.sub_county_id ? parseInt(form.sub_county_id) : null,
+          bedrooms: form.total_rooms ? parseInt(form.total_rooms) : 0, // Mapping rooms to bedroom column
+          sq_ft: form.sqft ? parseInt(form.sqft) : 0,
           listing_status: 'pending' 
         }])
         .select().single()
@@ -102,8 +111,7 @@ export default function AddPropertyPage() {
 
       if (images.length > 0) {
         for (const file of images) {
-          const fileExt = file.name.split('.').pop()
-          const fileName = `${Math.random()}.${fileExt}`
+          const fileName = `${Date.now()}-${file.name}`
           const filePath = `${property.id}/${fileName}`
           const { error: uploadError } = await supabase.storage.from('Property-image').upload(filePath, file)
           if (uploadError) throw uploadError
@@ -111,7 +119,7 @@ export default function AddPropertyPage() {
           await supabase.from('property_images').insert([{ property_id: property.id, url: publicUrl }])
         }
       }
-      alert("Listing submitted successfully!")
+      alert("Property listed successfully and pending review.")
       router.push('/dashboard')
     } catch (error: any) {
       alert(error.message)
@@ -120,7 +128,6 @@ export default function AddPropertyPage() {
     }
   }
 
-  // Helper for Custom Dropdown
   const renderCustomSelect = (label: string, value: string, options: any[], key: string, fieldName: string, disabled: boolean = false) => {
     const displayValue = options.find(o => String(o.id || o.value) === String(value))?.name || options.find(o => o.value === value)?.label || "Select Option"
     
@@ -128,151 +135,157 @@ export default function AddPropertyPage() {
       <div className="input-group" onClick={(e) => { e.stopPropagation(); if(!disabled) setActiveDropdown(activeDropdown === key ? null : key) }}>
         <label>{label}</label>
         <div className={`custom-select-trigger ${activeDropdown === key ? 'active' : ''} ${disabled ? 'disabled' : ''}`}>
-          <span>{disabled ? 'Select County first...' : displayValue}</span>
+          <span>{displayValue}</span>
           <span className="chevron" style={{ transform: activeDropdown === key ? 'rotate(180deg)' : 'none' }}>▼</span>
         </div>
         
-        <div className={`dropdown-menu ${activeDropdown === key ? 'open' : ''}`}>
-          {options.map((opt, i) => (
-            <div 
-              key={i} 
-              className="dropdown-item" 
-              onClick={() => {
-                setForm({...form, [fieldName]: String(opt.id || opt.value)})
-                setActiveDropdown(null)
-              }}
+        <AnimatePresence>
+          {activeDropdown === key && (
+            <motion.div 
+              initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+              className="dropdown-menu open"
             >
-              {opt.name || opt.label}
-            </div>
-          ))}
-        </div>
+              {options.map((opt, i) => (
+                <div key={i} className="dropdown-item" onClick={() => {
+                    setForm({...form, [fieldName]: String(opt.id || opt.value)})
+                    setActiveDropdown(null)
+                  }}>
+                  {opt.name || opt.label}
+                </div>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     )
   }
 
   return (
-    <div style={{ background: '#FDFCF9', minHeight: '100vh', padding: '40px 20px', color: '#1A1A1A' }}>
+    <div style={{ background: '#F8F9FA', minHeight: '100vh', padding: '60px 20px', color: '#1B1464' }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Bebas+Neue&display=swap');
         *, *::before, *::after { box-sizing: border-box; }
-        body { font-family: 'Outfit', sans-serif; }
+        body { font-family: 'Inter', sans-serif; }
 
-        .form-card { 
-          width: 100%; max-width: 800px; margin: 0 auto; background: #FFFFFF; 
-          border: 1px solid rgba(201, 168, 76, 0.2); border-radius: 32px; 
-          padding: 40px; box-shadow: 0 20px 50px rgba(0,0,0,0.03);
-        }
-
+        .form-card { width: 100%; max-width: 850px; margin: 0 auto; background: #FFF; border: 1px solid #E5E7EB; border-radius: 24px; padding: 50px; box-shadow: 0 10px 40px rgba(0,0,0,0.04); }
         .input-group { margin-bottom: 25px; position: relative; }
-        label { display: block; font-size: 11px; color: #A3432F; text-transform: uppercase; margin-bottom: 8px; font-weight: 800; letter-spacing: 1px; }
+        label { display: block; font-size: 10px; color: #2D004F; text-transform: uppercase; margin-bottom: 8px; font-weight: 800; letter-spacing: 1.5px; }
 
-        /* Custom Dropdown Styles */
-        .custom-select-trigger {
-          width: 100%; background: #F9F9F9; border: 1px solid #EEE; border-radius: 16px; 
-          padding: 14px 18px; color: #1A1A1A; cursor: pointer; display: flex; 
-          justify-content: space-between; align-items: center; transition: 0.3s;
-          font-size: 15px; font-weight: 500;
-        }
-        .custom-select-trigger.active { border-color: #A3432F; background: #FFF; box-shadow: 0 0 0 4px rgba(163, 67, 47, 0.05); }
-        .custom-select-trigger.disabled { opacity: 0.5; cursor: not-allowed; }
-        .chevron { font-size: 10px; color: #C9A84C; transition: 0.3s; }
+        .custom-select-trigger { width: 100%; background: #FFF; border: 1px solid #D1D5DB; border-radius: 12px; padding: 14px 18px; color: #1B1464; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: 0.2s; font-size: 14px; font-weight: 600; }
+        .custom-select-trigger.active { border-color: #7B2CBF; box-shadow: 0 0 0 4px rgba(123, 44, 191, 0.05); }
+        .chevron { font-size: 10px; color: #7B2CBF; }
 
-        .dropdown-menu {
-          position: absolute; top: 110%; left: 0; right: 0; background: white; 
-          border-radius: 16px; border: 1px solid #EEE; z-index: 100;
-          max-height: 0; opacity: 0; overflow-y: auto; overflow-x: hidden;
-          transform: translateY(-10px); transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-          box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-        }
-        .dropdown-menu.open { max-height: 250px; opacity: 1; transform: translateY(0); padding: 8px; }
+        .dropdown-menu { position: absolute; top: 110%; left: 0; right: 0; background: white; border-radius: 12px; border: 1px solid #E5E7EB; z-index: 100; max-height: 250px; overflow-y: auto; box-shadow: 0 20px 40px rgba(0,0,0,0.1); padding: 8px; }
+        .dropdown-item { padding: 12px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; color: #4B5563; font-weight: 600; }
+        .dropdown-item:hover { background: #F3E8FF; color: #7B2CBF; }
 
-        .dropdown-item {
-          padding: 12px 16px; border-radius: 10px; cursor: pointer; font-size: 14px;
-          color: #666; transition: 0.2s; font-weight: 600;
-        }
-        .dropdown-item:hover { background: #FCFAF7; color: #A3432F; }
-
-        input, textarea { width: 100%; background: #F9F9F9; border: 1px solid #EEE; border-radius: 16px; padding: 14px 18px; color: #1A1A1A; outline: none; transition: 0.3s; font-family: 'Outfit'; }
-        input:focus, textarea:focus { border-color: #A3432F; background: #FFF; box-shadow: 0 0 0 4px rgba(163, 67, 47, 0.05); }
+        input, textarea { width: 100%; background: #FFF; border: 1px solid #D1D5DB; border-radius: 12px; padding: 14px 18px; color: #1B1464; outline: none; transition: 0.2s; font-family: inherit; font-weight: 600; font-size: 14px; }
+        input:focus, textarea:focus { border-color: #7B2CBF; box-shadow: 0 0 0 4px rgba(123, 44, 191, 0.05); }
 
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .btn-submit { background: #A3432F; color: #FFF; width: 100%; padding: 18px; border: none; border-radius: 100px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; margin-top: 30px; transition: 0.3s; box-shadow: 0 10px 20px rgba(163, 67, 47, 0.2); }
-        .btn-submit:hover { background: #8E3A26; transform: translateY(-2px); }
-        .btn-submit:disabled { background: #CCC; cursor: not-allowed; transform: none; }
+        .amenity-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 15px; }
+        .amenity-chip { padding: 8px 16px; border-radius: 100px; border: 1px solid #E5E7EB; font-size: 12px; font-weight: 700; cursor: pointer; transition: 0.2s; background: white; color: #6B7280; }
+        .amenity-chip.selected { background: #2D004F; color: white; border-color: #2D004F; }
 
-        .image-upload-box { border: 2px dashed #C9A84C; background: rgba(201, 168, 76, 0.02); border-radius: 20px; padding: 40px; text-align: center; cursor: pointer; transition: 0.3s; }
-        .image-upload-box:hover { background: rgba(201, 168, 76, 0.05); }
+        .btn-submit { background: #2D004F; color: #FFF; width: 100%; padding: 20px; border: none; border-radius: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; margin-top: 40px; transition: 0.3s; }
+        .btn-submit:hover { background: #7B2CBF; transform: translateY(-2px); }
 
-        .back-link { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; color: #666; font-weight: 700; font-size: 12px; margin-bottom: 30px; transition: 0.3s; }
-        .back-link:hover { color: #A3432F; }
-
-        @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } .form-card { padding: 25px 20px; } }
+        .image-upload-box { border: 2px dashed #7B2CBF; background: #FDFCF9; border-radius: 16px; padding: 40px; text-align: center; cursor: pointer; }
+        
+        @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } .form-card { padding: 30px 20px; } }
       `}</style>
 
-      <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-        <Link href="/dashboard" className="back-link">← BACK TO DASHBOARD</Link>
+      <div style={{ maxWidth: '850px', margin: '0 auto' }}>
+        <Link href="/dashboard" style={{ textDecoration: 'none', color: '#6B7280', fontWeight: '800', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '30px', letterSpacing: '1px' }}>
+          ← CANCEL AND RETURN TO DASHBOARD
+        </Link>
       </div>
 
       <div className="form-card">
-        <h1 style={{ fontFamily: 'Bebas Neue', fontSize: '3rem', marginBottom: '10px', lineHeight: 1 }}>List New <span style={{ color: '#A3432F' }}>Property</span></h1>
-        <p style={{ color: '#888', marginBottom: '40px', fontWeight: '500' }}>Enter details below. Our team will verify the listing before it goes live.</p>
+        <h1 style={{ fontFamily: 'Bebas Neue', fontSize: '3.5rem', color: '#2D004F', margin: 0, letterSpacing: '1px' }}>Create <span style={{ color: '#7B2CBF' }}>New Listing</span></h1>
+        <p style={{ color: '#6B7280', marginBottom: '40px', fontWeight: '600', fontSize: '14px' }}>Provide the details of your property below for our verification team.</p>
 
         <form onSubmit={handleSubmit}>
           <div className="input-group">
-            <label>Property Title</label>
-            <input required placeholder="e.g. Luxury 4 Bedroom Villa in Karen" value={form.title} onChange={e => setForm({...form, title: e.target.value})} />
+            <label>Listing Title</label>
+            <input required placeholder="e.g. Elegant 4 Bedroom House with Garden" value={form.title} onChange={e => setForm({...form, title: e.target.value})} />
           </div>
 
           <div className="grid-2">
-            {renderCustomSelect("Property Category", form.property_type, [
-              { value: 'house', label: 'House' },
+            {renderCustomSelect("What are you listing?", form.property_type, [
+              { value: 'house', label: 'House / Villa' },
               { value: 'apartment', label: 'Apartment' },
               { value: 'land', label: 'Land / Plot' },
+              { value: 'house_land', label: 'House + Land (Compound)' },
               { value: 'commercial', label: 'Commercial' }
             ], 'cat', 'property_type')}
 
-            {renderCustomSelect("Listing Status", form.listing_purpose, [
+            {renderCustomSelect("Purpose", form.listing_purpose, [
               { value: 'sale', label: 'For Sale' },
-              { value: 'rent', label: 'For Rent' }
+              { value: 'rent', label: 'For Rent (Monthly)' }
             ], 'purp', 'listing_purpose')}
           </div>
 
           <div className="grid-2">
             <div className="input-group">
-              <label>Price (KES)</label>
-              <input required type="number" placeholder="e.g. 15000000" value={form.price} onChange={e => setForm({...form, price: e.target.value})} />
+              <label>Asking Price (KES)</label>
+              <input required type="number" placeholder="Total price or monthly rent" value={form.price} onChange={e => setForm({...form, price: e.target.value})} />
             </div>
             {renderCustomSelect("County", form.county_id, counties, 'county', 'county_id')}
           </div>
 
-          {renderCustomSelect("Sub-County / Area", form.sub_county_id, subCounties, 'subcounty', 'sub_county_id', !form.county_id)}
+          {renderCustomSelect("Sub-County / Area (Optional)", form.sub_county_id, subCounties, 'subcounty', 'sub_county_id', !form.county_id)}
 
           <div className="grid-2">
+            {/* Conditional Room Input: Hide if strictly Land */}
+            {form.property_type !== 'land' ? (
+              <div className="input-group">
+                <label>Total Rooms</label>
+                <input type="number" placeholder="e.g. 5" value={form.total_rooms} onChange={e => setForm({...form, total_rooms: e.target.value})} />
+              </div>
+            ) : (
+              <div className="input-group">
+                <label>Land Status</label>
+                <input placeholder="e.g. Freehold / Leasehold" />
+              </div>
+            )}
+
             <div className="input-group">
-              <label>Bedrooms</label>
-              <input type="number" placeholder="0" value={form.bedrooms} onChange={e => setForm({...form, bedrooms: e.target.value})} />
+              <label>{form.property_type === 'land' || form.property_type === 'house_land' ? 'Total Size (Acres/SqFt)' : 'Floor Area (SqFt)'}</label>
+              <input type="text" placeholder="e.g. 0.5 Acres" value={form.sqft} onChange={e => setForm({...form, sqft: e.target.value})} />
             </div>
-            <div className="input-group">
-              <label>Bathrooms</label>
-              <input type="number" placeholder="0" value={form.bathrooms} onChange={e => setForm({...form, bathrooms: e.target.value})} />
+          </div>
+
+          <div className="input-group">
+            <label>Quick Features (Select all that apply)</label>
+            <div className="amenity-grid">
+              {availableAmenities.map((amn) => (
+                <div 
+                  key={amn.id} 
+                  className={`amenity-chip ${selectedAmenities.includes(amn.name) ? 'selected' : ''}`}
+                  onClick={() => toggleAmenity(amn.name)}
+                >
+                  {selectedAmenities.includes(amn.name) ? '✓ ' : '+ '} {amn.name}
+                </div>
+              ))}
             </div>
           </div>
 
           <div className="input-group">
             <label>Detailed Description</label>
-            <textarea rows={6} placeholder="Amenities, security features, surroundings..." value={form.description} onChange={e => setForm({...form, description: e.target.value})} />
+            <textarea rows={4} placeholder="Tell us more about the environment, security, and unique selling points..." value={form.description} onChange={e => setForm({...form, description: e.target.value})} />
           </div>
 
           <div className="input-group">
-            <label>Property Photographs</label>
+            <label>Property Photos</label>
             <div className="image-upload-box" onClick={() => document.getElementById('file-input')?.click()}>
-                <span style={{ fontSize: '24px', display: 'block' }}>📸</span>
-                <span style={{ fontSize: '13px', fontWeight: '700', color: '#C9A84C' }}>CLICK TO UPLOAD IMAGES</span>
+                <span style={{ fontSize: '30px', display: 'block', marginBottom: '10px' }}>🖼️</span>
+                <span style={{ fontSize: '11px', fontWeight: '800', color: '#7B2CBF', letterSpacing: '1px' }}>CLICK TO BROWSE GALLERY</span>
                 <input id="file-input" type="file" multiple accept="image/*" onChange={handleImageChange} style={{ display: 'none' }} />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '12px', marginTop: '20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '10px', marginTop: '20px' }}>
               {previews.map((src, i) => (
-                <div key={i} style={{ position: 'relative', height: '90px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #EEE' }}>
+                <div key={i} style={{ height: '85px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #E5E7EB' }}>
                     <img src={src} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
               ))}
@@ -280,12 +293,10 @@ export default function AddPropertyPage() {
           </div>
 
           <button type="submit" className="btn-submit" disabled={loading}>
-            {loading ? 'UPLOADING ASSETS...' : 'SUBMIT PROPERTY FOR REVIEW'}
+            {loading ? 'PROCESSING ASSETS...' : 'LIST PROPERTY NOW'}
           </button>
         </form>
       </div>
-
-      <p style={{ textAlign: 'center', marginTop: '40px', fontSize: '11px', color: '#BBB', fontWeight: '700' }}>BETTERMENT GROUP • SECURE ECOSYSTEM</p>
     </div>
   )
 }

@@ -23,26 +23,33 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
   const path = request.nextUrl.pathname
+  
+  // Get role from user_metadata (Instant, no DB call)
+  const role = user?.user_metadata?.role
 
-  // ── Protected routes ──────────────────────────────────────
+  // ── Access Control ──────────────────────────────────────
 
-  // Dashboard — agents only
+  // 1. If trying to access Agent Dashboard
   if (path.startsWith('/dashboard')) {
     if (!user) return NextResponse.redirect(new URL('/auth/login', request.url))
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-    if (profile?.role === 'buyer') return NextResponse.redirect(new URL('/?error=agent_only', request.url))
+    // Only Agents and Admins allowed
+    if (role !== 'agent' && role !== 'admin') {
+      return NextResponse.redirect(new URL('/?error=unauthorized_access', request.url))
+    }
   }
 
-  // Admin panel — admins only
+  // 2. If trying to access Admin Panel
   if (path.startsWith('/admin')) {
     if (!user) return NextResponse.redirect(new URL('/auth/login', request.url))
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-    if (profile?.role !== 'admin') return NextResponse.redirect(new URL('/', request.url))
+    // Strictly Admins only
+    if (role !== 'admin') {
+      return NextResponse.redirect(new URL('/', request.url))
+    }
   }
 
-  // Auth pages — redirect logged-in users away
-  if (path.startsWith('/auth/login') || path.startsWith('/auth/register')) {
-    if (user) return NextResponse.redirect(new URL('/', request.url))
+  // 3. If logged in, don't show Login/Register pages
+  if ((path.startsWith('/auth/login') || path.startsWith('/auth/register')) && user) {
+    return NextResponse.redirect(new URL('/', request.url))
   }
 
   return supabaseResponse

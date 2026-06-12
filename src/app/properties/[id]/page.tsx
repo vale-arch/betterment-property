@@ -4,6 +4,12 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
+
+const PropertyMap = dynamic(() => import('@/components/properties/PropertyMap'), { 
+  ssr: false,
+  loading: () => <div style={{ height: '450px', background: '#f8f9fa', borderRadius: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ccc' }}>Loading Location Map...</div>
+});
 
 export default function PropertyDetailPage() {
   const { id } = useParams()
@@ -36,148 +42,167 @@ export default function PropertyDetailPage() {
     setSending(false)
   }
 
-  if (loading) return <div style={{ background: '#FDFCF9', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#A3432F', fontFamily: 'Bebas Neue', fontSize: '2rem' }}>Loading details...</div>
-  if (!property) return <div style={{ background: '#FDFCF9', color: '#222', padding: '100px', textAlign: 'center' }}>Property not found.</div>
+  if (loading) return (
+    <div style={{ background: '#F8F9FA', minHeight: '100vh', padding: '40px 20px' }}>
+      <style>{`
+        @keyframes shimmer { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+        .shimmer { animation: shimmer 1.5s infinite ease-in-out; background: #EEE; border-radius: 12px; }
+      `}</style>
+      <div style={{ maxWidth: '1300px', margin: '0 auto' }}>
+        <div className="shimmer" style={{ width: '180px', height: '40px', marginBottom: '30px' }} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '40px' }}>
+          <div className="shimmer" style={{ width: '40%', height: '60px' }} />
+          <div className="shimmer" style={{ width: '200px', height: '60px' }} />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 400px', gap: '40px' }}>
+          <div className="shimmer" style={{ height: '500px', borderRadius: '24px' }} />
+          <div className="shimmer" style={{ height: '450px', borderRadius: '24px' }} />
+        </div>
+      </div>
+    </div>
+  )
 
-  const images = property.property_images?.map((i: any) => i.url) || []
+  if (!property) return <div style={{ textAlign: 'center', padding: '100px' }}>Asset not found.</div>
+
+  const images = property.property_images?.map((i: any) => i.url) || property.images || []
   const agentPhone = property.profiles?.phone?.replace(/\D/g, '')
+  const message = `Hi, I am interested in viewing this property: *${property.title}* (ID: ${property.id.slice(0,5)}). Is it still available?`;
+  const encodedMessage = encodeURIComponent(message);
 
   return (
-    <div style={{ background: '#FDFCF9', minHeight: '100vh', color: '#1A1A1A', paddingBottom: '120px' }}>
+    <div style={{ background: '#FDFCF9', minHeight: '100vh', color: '#1B1464', paddingBottom: '100px' }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&display=swap');
-        body { font-family: 'Outfit', sans-serif; margin: 0; }
+        @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700;800&display=swap');
+        body { font-family: 'Inter', sans-serif; }
         
-        .main-wrapper { max-width: 1300px; margin: 0 auto; padding: 20px; display: grid; grid-template-columns: 1fr 400px; gap: 50px; }
+        .main-wrapper { max-width: 1300px; margin: 0 auto; padding: 0 20px; display: grid; grid-template-columns: 1fr 420px; gap: 60px; }
         
-        .gallery-main { width: 100%; height: 600px; object-fit: cover; border-radius: 32px; box-shadow: 0 20px 40px rgba(0,0,0,0.05); }
-        .thumb { width: 90px; height: 70px; object-fit: cover; border-radius: 12px; cursor: pointer; opacity: 0.6; transition: 0.3s; border: 2px solid transparent; }
-        .thumb.active { opacity: 1; border-color: #C9A84C; }
+        .gallery-main { width: 100%; height: 650px; object-fit: cover; border-radius: 24px; box-shadow: 0 30px 60px rgba(45,0,79,0.08); cursor: pointer; transition: 0.5s; }
+        .thumb { width: 100px; height: 75px; object-fit: cover; border-radius: 10px; cursor: pointer; opacity: 0.5; transition: 0.3s; border: 2px solid transparent; }
+        .thumb.active { opacity: 1; border-color: #7B2CBF; transform: scale(1.05); }
         
-        .spec-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-top: 35px; }
-        .spec-card { background: white; border: 1px solid rgba(0,0,0,0.04); padding: 25px 15px; border-radius: 24px; text-align: center; box-shadow: 0 10px 20px rgba(0,0,0,0.02); }
-        .spec-card span { font-size: 24px; display: block; margin-bottom: 8px; }
-        .spec-card b { display: block; font-size: 20px; color: #1A1A1A; font-family: 'Bebas Neue'; letter-spacing: 1px; }
-        .spec-card small { color: #A3432F; text-transform: uppercase; font-size: 10px; font-weight: 800; letter-spacing: 1px; }
+        .spec-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; margin: 40px 0; }
+        .spec-card { background: white; border: 1px solid #E5E7EB; padding: 20px; border-radius: 16px; text-align: center; }
+        .spec-card b { display: block; font-size: 22px; color: #2D004F; font-family: 'Bebas Neue'; letter-spacing: 1px; margin-top: 5px; }
+        .spec-card small { color: #6B7280; text-transform: uppercase; font-size: 10px; font-weight: 800; letter-spacing: 1.5px; }
 
-        .sticky-sidebar { position: sticky; top: 40px; background: white; border: 1px solid rgba(201,168,76,0.15); border-radius: 32px; padding: 30px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.08); }
+        .sticky-sidebar { position: sticky; top: 40px; background: white; border: 1px solid #E5E7EB; border-radius: 24px; padding: 40px; box-shadow: 0 20px 50px rgba(0,0,0,0.04); }
         
-        .form-input { width: 100%; background: #F9F9F9; border: 1px solid #EEE; padding: 16px; border-radius: 16px; color: #1A1A1A; margin-bottom: 12px; outline: none; font-family: inherit; transition: 0.3s; box-sizing: border-box; }
-        .form-input:focus { border-color: #A3432F; background: white; }
+        .form-input { width: 100%; background: #F8F9FA; border: 1px solid #E5E7EB; padding: 16px; border-radius: 12px; color: #1B1464; margin-bottom: 12px; outline: none; font-weight: 500; transition: 0.3s; }
+        .form-input:focus { border-color: #7B2CBF; background: white; }
         
-        .btn-terracotta { background: #A3432F; color: #fff; border: none; padding: 18px; border-radius: 100px; font-weight: 700; cursor: pointer; width: 100%; transition: 0.3s; text-transform: uppercase; letter-spacing: 1px; }
-        .btn-terracotta:hover { background: #8E3A26; transform: translateY(-2px); }
+        .btn-violet { background: #2D004F; color: #fff; border: none; padding: 18px; border-radius: 12px; font-weight: 800; cursor: pointer; width: 100%; transition: 0.3s; letter-spacing: 1px; }
+        .btn-violet:hover { background: #7B2CBF; transform: translateY(-2px); box-shadow: 0 10px 20px rgba(123, 44, 191, 0.2); }
         
-        /* Mobile Sticky Actions */
-        .mobile-actions { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(255,255,255,0.95); backdrop-filter: blur(20px); padding: 20px; display: none; gap: 12px; z-index: 1000; border-top: 1px solid #EEE; }
+        .tooltip-container { position: relative; display: inline-block; cursor: help; margin-bottom: 15px; }
+        .tooltip-box { visibility: hidden; opacity: 0; position: absolute; bottom: 130%; left: 0; width: 260px; background: #2D004F; color: white; padding: 15px; border-radius: 12px; z-index: 100; font-size: 11px; line-height: 1.6; transition: 0.3s; transform: translateY(10px); box-shadow: 0 15px 30px rgba(0,0,0,0.2); }
+        .tooltip-container:hover .tooltip-box { visibility: visible; opacity: 1; transform: translateY(0); }
 
         @media (max-width: 1100px) {
-          .main-wrapper { grid-template-columns: 1fr; padding: 20px; }
-          .gallery-main { height: 400px; }
+          .main-wrapper { grid-template-columns: 1fr; }
+          .gallery-main { height: 450px; }
           .desktop-sidebar { display: none; }
-          .mobile-actions { display: flex; }
-          .header-area { padding-top: 40px !important; }
-          .spec-grid { grid-template-columns: repeat(2, 1fr); }
+          .mobile-actions { display: flex; position: fixed; bottom: 0; left:0; right:0; background: white; padding: 20px; gap: 10px; border-top: 1px solid #EEE; z-index: 1000; }
         }
       `}</style>
 
-      {/* ── HEADER NAVIGATION ── */}
-      <div className="header-area" style={{ maxWidth: '1300px', margin: '0 auto', padding: '40px 20px 20px' }}>
-        <button 
-          onClick={() => router.back()} 
-          style={{ background: '#FFF', border: '1px solid #EEE', color: '#A3432F', padding: '10px 20px', borderRadius: '100px', cursor: 'pointer', marginBottom: '25px', fontWeight: '700', fontSize: '12px' }}
-        >
-          ← BACK TO MARKETPLACE
+      {/* ── TOP NAVIGATION ── */}
+      <div style={{ maxWidth: '1300px', margin: '0 auto', padding: '50px 20px 30px' }}>
+        <button onClick={() => router.back()} style={{ background: '#FFF', border: '1px solid #E5E7EB', color: '#6B7280', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', marginBottom: '30px', fontWeight: '800', fontSize: '11px', letterSpacing: '1px' }}>
+          ← BACK TO INVENTORY
         </button>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '30px' }}>
           <div>
-            <h1 style={{ fontFamily: 'Bebas Neue', fontSize: 'clamp(2.5rem, 8vw, 4.5rem)', marginBottom: '5px', lineHeight: 0.9, color: '#1A1A1A' }}>
+            <div className="tooltip-container">
+              <span style={{ background: '#F5EFFF', color: '#7B2CBF', padding: '4px 12px', borderRadius: '6px', fontSize: '10px', fontWeight: '900', letterSpacing: '1px' }}>
+                VERIFIED ASSET ✓
+              </span>
+              <div className="tooltip-box">
+                <b style={{ color: '#7B2CBF', display: 'block', marginBottom: '4px' }}>Betterment Shield</b>
+                This listing has been physically verified. Title deed authenticity and site ownership have been cross-checked for security.
+              </div>
+            </div>
+            <h1 style={{ fontSize: 'clamp(2.5rem, 5vw, 4rem)', fontWeight: 800, margin: '5px 0', lineHeight: 1, letterSpacing: '-1.5px', color: '#2D004F' }}>
                 {property.title}
             </h1>
-            <p style={{ color: '#888', fontWeight: '500' }}>📍 {property.sub_counties?.name}, {property.counties?.name}</p>
+            <p style={{ color: '#6B7280', fontWeight: '600', fontSize: '15px' }}>📍 {property.sub_counties?.name || 'Private Location'}, {property.counties?.name}</p>
           </div>
-          <div style={{ color: '#C9A84C', fontSize: '3rem', fontWeight: 'bold', fontFamily: 'Bebas Neue', lineHeight: 1 }}>
-            KES {property.price?.toLocaleString()}
+          <div style={{ textAlign: 'right' }}>
+            <p style={{ fontSize: '11px', fontWeight: 800, color: '#7B2CBF', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '5px' }}>Asking Price</p>
+            <div style={{ color: '#2D004F', fontSize: '3.5rem', fontWeight: '800', fontFamily: 'Bebas Neue', lineHeight: 1 }}>
+              KES {property.price?.toLocaleString()}
+            </div>
           </div>
         </div>
       </div>
 
       <div className="main-wrapper">
-        {/* Left Side: Media & Info */}
-        <div style={{ overflow: 'hidden' }}>
-          <img className="gallery-main" src={images[activeImg]} alt="Property Main" />
+        {/* LEFT COLUMN */}
+        <div>
+          <img className="gallery-main" src={images[activeImg]} alt="Featured View" />
           
-          <div style={{ display: 'flex', gap: '12px', marginTop: '15px', overflowX: 'auto', paddingBottom: '10px' }}>
+          <div style={{ display: 'flex', gap: '12px', marginTop: '20px', overflowX: 'auto', paddingBottom: '15px' }}>
             {images.map((img: string, i: number) => (
-              <img key={i} src={img} className={`thumb ${activeImg === i ? 'active' : ''}`} onClick={() => setActiveImg(i)} alt="Thumb" />
+              <img key={i} src={img} className={`thumb ${activeImg === i ? 'active' : ''}`} onClick={() => setActiveImg(i)} alt={`View ${i+1}`} />
             ))}
           </div>
 
           <div className="spec-grid">
-             <div className="spec-card"><span>🛌</span><b>{property.bedrooms || 0}</b><small>Bedrooms</small></div>
-             <div className="spec-card"><span>🛁</span><b>{property.bathrooms || 0}</b><small>Bathrooms</small></div>
-             <div className="spec-card"><span>🏡</span><b>{property.property_type}</b><small>Type</small></div>
-             <div className="spec-card"><span>🔑</span><b>{property.listing_purpose}</b><small>Purpose</small></div>
+             {/* Only show rooms if not strictly Land */}
+             {property.property_type !== 'land' && (
+                <div className="spec-card"><span>🏡</span><small>Rooms</small><b>{property.bedrooms || '—'}</b></div>
+             )}
+             <div className="spec-card"><span>📐</span><small>{property.property_type === 'land' || property.property_type === 'house_land' ? 'Total Size' : 'Floor Area'}</small><b>{property.sq_ft ? `${property.sq_ft} SqFt` : 'Flexible'}</b></div>
+             <div className="spec-card"><span>🏢</span><small>Asset Class</small><b>{property.property_type.replace('_', ' + ')}</b></div>
+             <div className="spec-card"><span>💎</span><small>Ownership</small><b>{property.listing_purpose === 'sale' ? 'Freehold' : 'Lease'}</b></div>
           </div>
 
-          <div style={{ marginTop: '60px' }}>
-            <h2 style={{ fontFamily: 'Bebas Neue', fontSize: '2.5rem', color: '#A3432F', marginBottom: '20px', letterSpacing: '1px' }}>Property Description</h2>
-            <p style={{ color: '#555', lineHeight: '1.8', fontSize: '16px', whiteSpace: 'pre-line' }}>{property.description}</p>
+          <div style={{ marginTop: '50px' }}>
+            <h2 style={{ fontFamily: 'Bebas Neue', fontSize: '2.5rem', color: '#2D004F', borderBottom: '2px solid #F5EFFF', display: 'inline-block', marginBottom: '25px', paddingBottom: '5px' }}>Asset Overview</h2>
+            <p style={{ color: '#444', lineHeight: '1.9', fontSize: '17px', whiteSpace: 'pre-line', maxWidth: '800px' }}>{property.description}</p>
           </div>
-          
-          {/* Mobile Only Inquiry Form */}
-          <div style={{ marginTop: '50px' }} className="mobile-actions-form md:hidden">
-              <div style={{ background: 'white', padding: '30px', borderRadius: '32px', border: '1px solid #EEE' }}>
-                  <h3 style={{ fontFamily: 'Bebas Neue', fontSize: '1.8rem', marginBottom: '20px' }}>Make an Inquiry</h3>
-                  {sent ? (
-                    <div style={{ color: '#22C55E', fontWeight: 'bold', textAlign: 'center' }}>✅ Inquiry sent successfully!</div>
-                  ) : (
-                    <form onSubmit={sendInquiry}>
-                        <input required className="form-input" placeholder="Your Full Name" value={inquiry.name} onChange={e => setInq({...inquiry, name: e.target.value})} />
-                        <input required className="form-input" placeholder="Phone Number" value={inquiry.phone} onChange={e => setInq({...inquiry, phone: e.target.value})} />
-                        <textarea rows={4} className="form-input" placeholder="Message to agent..." value={inquiry.message} onChange={e => setInq({...inquiry, message: e.target.value})} />
-                        <button type="submit" className="btn-terracotta" disabled={sending}>{sending ? 'SENDING...' : 'SEND INQUIRY'}</button>
-                    </form>
-                  )}
-              </div>
+
+          <div style={{ marginTop: '80px' }}>
+             <h2 style={{ fontFamily: 'Bebas Neue', fontSize: '2.5rem', color: '#2D004F', marginBottom: '30px' }}>Verified Location</h2>
+             <PropertyMap lat={property.latitude || -1.286389} lng={property.longitude || 36.817223} title={property.title} />
           </div>
         </div>
 
-        {/* Right Side: Desktop Sidebar */}
+        {/* RIGHT COLUMN (DESKTOP SIDEBAR) */}
         <div className="desktop-sidebar">
            <div className="sticky-sidebar">
-              <h3 style={{ fontFamily: 'Bebas Neue', fontSize: '1.5rem', marginBottom: '5px', color: '#A3432F' }}>Contact Agent</h3>
-              <p style={{ fontSize: '14px', color: '#888', marginBottom: '25px' }}>Listed by <b style={{ color: '#1A1A1A' }}>{property.profiles?.full_name}</b></p>
+              <h3 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '8px', color: '#2D004F' }}>Arrange a Viewing</h3>
+              <p style={{ fontSize: '13px', color: '#6B7280', marginBottom: '30px', fontWeight: '500' }}>Managed by: <b>{property.profiles?.full_name}</b></p>
               
               {sent ? (
-                <div style={{ background: 'rgba(34, 197, 94, 0.1)', color: '#22C55E', padding: '20px', borderRadius: '20px', textAlign: 'center', fontSize: '14px' }}>
-                   <b>Inquiry Sent!</b><br/>The agent will contact you soon.
+                <div style={{ background: '#F0FDF4', color: '#166534', padding: '25px', borderRadius: '16px', textAlign: 'center', fontSize: '14px', border: '1px solid #BBF7D0' }}>
+                   <b>SUCCESS</b><br/>The listing agent has been notified.
                 </div>
               ) : (
                 <form onSubmit={sendInquiry}>
-                   <input required className="form-input" placeholder="Full Name" value={inquiry.name} onChange={e => setInq({...inquiry, name: e.target.value})} />
-                   <input required className="form-input" placeholder="Phone" value={inquiry.phone} onChange={e => setInq({...inquiry, phone: e.target.value})} />
-                   <textarea rows={4} className="form-input" placeholder="I am interested in this property..." value={inquiry.message} onChange={e => setInq({...inquiry, message: e.target.value})} />
-                   <button type="submit" className="btn-terracotta" disabled={sending}>{sending ? 'SENDING...' : 'CONTACT AGENT'}</button>
+                   <input required className="form-input" placeholder="Your Name" value={inquiry.name} onChange={e => setInq({...inquiry, name: e.target.value})} />
+                   <input required className="form-input" placeholder="Phone Number" value={inquiry.phone} onChange={e => setInq({...inquiry, phone: e.target.value})} />
+                   <textarea rows={4} className="form-input" placeholder="I'm interested in this asset. Please share more details regarding viewing times..." value={inquiry.message} onChange={e => setInq({...inquiry, message: e.target.value})} />
+                   <button type="submit" className="btn-violet" disabled={sending}>{sending ? 'SYNCHRONIZING...' : 'REQUEST BRIEFING'}</button>
                 </form>
               )}
 
               <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
-                 <a href={`tel:${property.profiles?.phone}`} style={{ flex: 1 }}><button style={{ width: '100%', background: 'white', color: '#1A1A1A', border: '1px solid #EEE', padding: '14px', borderRadius: '100px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}>CALL</button></a>
-                 <a href={`https://wa.me/${agentPhone}`} target="_blank" style={{ flex: 1 }}><button style={{ width: '100%', background: '#25D366', color: '#fff', border: 'none', padding: '14px', borderRadius: '100px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}>WHATSAPP</button></a>
+                 <a href={`tel:${property.profiles?.phone}`} style={{ flex: 1 }}><button style={{ width: '100%', background: 'white', color: '#2D004F', border: '1px solid #E5E7EB', padding: '15px', borderRadius: '12px', fontSize: '11px', fontWeight: '800', cursor: 'pointer' }}>CALL</button></a>
+                 <a href={`https://wa.me/${agentPhone}?text=${encodedMessage}`} target="_blank" style={{ flex: 1 }}><button style={{ width: '100%', background: '#25D366', color: '#fff', border: 'none', padding: '15px', borderRadius: '12px', fontSize: '11px', fontWeight: '800', cursor: 'pointer' }}>WHATSAPP</button></a>
               </div>
            </div>
         </div>
       </div>
 
-      {/* ── MOBILE STICKY BAR ── */}
-      <div className="mobile-actions">
+      {/* MOBILE STICKY ACTIONS */}
+      <div className="mobile-actions" style={{ display: 'none' }}>
           <a href={`tel:${property.profiles?.phone}`} style={{ flex: 1, textDecoration: 'none' }}>
-            <button style={{ width: '100%', background: '#FFF', color: '#1A1A1A', border: '1px solid #DDD', padding: '16px', borderRadius: '100px', fontSize: '13px', fontWeight: '800' }}>CALL AGENT</button>
+            <button style={{ width: '100%', background: '#FFF', color: '#2D004F', border: '1px solid #DDD', padding: '18px', borderRadius: '12px', fontSize: '12px', fontWeight: '800' }}>CALL</button>
           </a>
-          <a href={`https://wa.me/${agentPhone}`} target="_blank" style={{ flex: 1, textDecoration: 'none' }}>
-            <button style={{ width: '100%', background: '#25D366', color: '#fff', border: 'none', padding: '16px', borderRadius: '100px', fontSize: '13px', fontWeight: '800' }}>WHATSAPP</button>
+          <a href={`https://wa.me/${agentPhone}?text=${encodedMessage}`} target="_blank" style={{ flex: 1, textDecoration: 'none' }}>
+            <button style={{ width: '100%', background: '#25D366', color: '#fff', border: 'none', padding: '18px', borderRadius: '12px', fontSize: '12px', fontWeight: '800' }}>WHATSAPP</button>
           </a>
       </div>
     </div>

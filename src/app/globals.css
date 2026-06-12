@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+@config "../../tailwind.config.js";
+
+@layer base {
+  body {
+    background-color: #F8F9FA; /* Arctic White */
+    color: #1B1464;            /* Midnight Navy */
+    font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* Corporate Button Glow */
+.btn-purple {
+  @apply bg-[#4834D4] text-white shadow-[0_10px_20px_-5px_rgba(72,52,212,0.3)] hover:bg-[#1B1464] transition-all duration-300;
+}
+/* Luxury Tooltip Animation */
+.tooltip-box {
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.group:hover .tooltip-box {
+  visibility: visible;
+  opacity: 1;
+  transform: translateY(0);
+}
+/* Luxury Tooltip Animation */
+.tooltip-box {
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.group:hover .tooltip-box {
+  visibility: visible;
+  opacity: 1;
+  transform: translateY(0);
+}
