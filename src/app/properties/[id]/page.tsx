@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/client'
 import PropertyClient from '@/components/properties/PropertyClient'
+import loading from '@/components/ui/LoadingSpinner'
+import SimilarProperties from '@/components/properties/SimilarProperties';
 
 // THIS HANDLES DYNAMIC SEO (Tab name changes to house name)
 export async function generateMetadata({ params }: { params: { id: string } }) {

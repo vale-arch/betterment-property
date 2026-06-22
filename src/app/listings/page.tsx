@@ -5,6 +5,11 @@ import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
+import { supabaseLoader } from '@/lib/image-loader'
+import Image from 'next/image'
+import SimilarProperties from '@/components/properties/SimilarProperties'
+import PropertyClient from '@/components/properties/PropertyClient'
+import LoadingSpinner from '@/components/ui/LoadingSpinner'
 
 export default function ListingsPage() {
   const router = useRouter()
@@ -219,14 +224,20 @@ export default function ListingsPage() {
             >
               <Link href={`/properties/${p.id}`} style={{ textDecoration: 'none' }}>
                 <div className="p-card">
-                  <div style={{ position: 'relative', overflow: 'hidden', height: '280px' }}>
-                    <img 
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      src={p.property_images?.[0]?.url || p.images?.[0] || 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800'} 
-                      alt={p.title}
-                    />
-                    <div className="price-tag">KES {p.price?.toLocaleString()}</div>
-                  </div>
+                  
+                  <div style={{ position: 'relative', overflow: 'hidden', height: '280px', background: '#F1F5F9' }}>
+  <Image 
+    loader={supabaseLoader}
+    src={p.property_images?.[0]?.url || p.images?.[0] || 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800'} 
+    alt={p.title}
+    fill
+    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+    style={{ objectFit: 'cover' }}
+    className="transition-transform duration-500 hover:scale-110"
+    priority={index < 3} // Only the first 3 images load instantly, others are lazy-loaded
+  />
+  <div className="price-tag">KES {p.price?.toLocaleString()}</div>
+</div>
                   
                   <div style={{ padding: '30px' }}>
                     <div style={{ color: '#7B2CBF', fontSize: '10px', fontWeight: '900', letterSpacing: '2px', marginBottom: '10px', background: '#F5EFFF', display: 'inline-block', padding: '2px 8px', borderRadius: '4px' }}>

@@ -11,7 +11,7 @@ export default function AddPropertyPage() {
   const supabase = createClient()
 
   // Constants
-  const MAX_IMAGES = 10;
+  const MAX_IMAGES = 20;
   const MAX_FILE_SIZE_MB = 5;
 
   // Form States
@@ -42,6 +42,8 @@ export default function AddPropertyPage() {
     async function fetchData() {
       const { data: cData } = await supabase.from('counties').select('*').order('name')
       if (cData) setCounties(cData)
+      
+      // Fetching the amenities from your Supabase table
       const { data: aData } = await supabase.from('amenities').select('*').order('name')
       if (aData) setAvailableAmenities(aData)
     }
@@ -62,18 +64,15 @@ export default function AddPropertyPage() {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const files = Array.from(e.target.files)
-      
       if (images.length + files.length > MAX_IMAGES) {
         alert(`You can only upload a maximum of ${MAX_IMAGES} photos.`)
         return
       }
-
       const oversized = files.filter(f => f.size > MAX_FILE_SIZE_MB * 1024 * 1024)
       if (oversized.length > 0) {
         alert(`Some images are too large. Max size is ${MAX_FILE_SIZE_MB}MB.`)
         return
       }
-
       setImages(prev => [...prev, ...files])
       const newPreviews = files.map(file => URL.createObjectURL(file))
       setPreviews(prev => [...prev, ...newPreviews])
@@ -100,20 +99,20 @@ export default function AddPropertyPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error("Please sign in to list properties.")
 
-      const finalDescription = `${form.description}\n\nFeatures: ${selectedAmenities.join(', ')}`
-
+      // 1. Send listing data to Properties Table
       const { data: property, error: pError } = await supabase
         .from('properties')
         .insert([{
           owner_id: user.id,
           title: form.title,
-          description: finalDescription,
+          description: form.description,
+          features: selectedAmenities, // Saving the Quick Select array
           property_type: form.property_type,
           listing_purpose: form.listing_purpose,
           price: parseFloat(form.price),
           county_id: parseInt(form.county_id),
           sub_county_id: form.sub_county_id ? parseInt(form.sub_county_id) : null,
-          bedrooms: form.total_rooms ? parseInt(form.total_rooms) : 0,
+          bedrooms: form.total_rooms ? parseInt(form.total_rooms) : 0, // Mapping rooms to DB
           sq_ft: form.sqft ? parseInt(form.sqft) : 0,
           listing_status: 'pending' 
         }])
@@ -121,6 +120,7 @@ export default function AddPropertyPage() {
 
       if (pError) throw pError
 
+      // 2. Handle Image Uploads
       if (images.length > 0) {
         for (const file of images) {
           const fileName = `${Date.now()}-${file.name}`
@@ -128,10 +128,14 @@ export default function AddPropertyPage() {
           const { error: uploadError } = await supabase.storage.from('Property-image').upload(filePath, file)
           if (uploadError) throw uploadError
           const { data: { publicUrl } } = supabase.storage.from('Property-image').getPublicUrl(filePath)
+          
+          // Save to images table and update main property array
           await supabase.from('property_images').insert([{ property_id: property.id, url: publicUrl }])
+          await supabase.rpc('append_property_image', { prop_id: property.id, image_url: publicUrl })
         }
       }
-      alert("Asset registered! Our team will verify it shortly.")
+
+      alert("Success! Your listing has been sent for verification.")
       router.push('/dashboard')
     } catch (error: any) { alert(error.message) } finally { setLoading(false) }
   }
@@ -178,7 +182,7 @@ export default function AddPropertyPage() {
         input:focus, textarea:focus { border-color: #7B2CBF; }
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         .amenity-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 15px; }
-        .amenity-chip { padding: 8px 16px; border-radius: 100px; border: 1px solid #E5E7EB; font-size: 11px; font-weight: 700; cursor: pointer; transition: 0.2s; background: white; color: #6B7280; }
+        .amenity-chip { padding: 10px 18px; border-radius: 12px; border: 1px solid #E5E7EB; font-size: 11px; font-weight: 700; cursor: pointer; transition: 0.2s; background: white; color: #6B7280; }
         .amenity-chip.selected { background: #2D004F; color: white; border-color: #2D004F; }
         .btn-submit { background: #2D004F; color: #FFF; width: 100%; padding: 20px; border: none; border-radius: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; margin-top: 40px; transition: 0.3s; }
         .btn-submit:hover { background: #7B2CBF; transform: translateY(-2px); }
@@ -189,12 +193,12 @@ export default function AddPropertyPage() {
 
       <div style={{ maxWidth: '850px', margin: '0 auto' }}>
         <Link href="/dashboard" style={{ textDecoration: 'none', color: '#6B7280', fontWeight: '800', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '30px', letterSpacing: '1px' }}>
-          ← EXIT TO DASHBOARD
+          ← CANCEL AND RETURN TO DASHBOARD
         </Link>
       </div>
 
       <div className="form-card">
-        <h1 style={{ fontFamily: 'Bebas Neue', fontSize: '3.5rem', color: '#2D004F', margin: 0 }}>List New <span style={{ color: '#7B2CBF' }}>Asset</span></h1>
+        <h1 style={{ fontFamily: 'Bebas Neue', fontSize: '3.5rem', color: '#2D004F', margin: 0 }}>Register <span style={{ color: '#7B2CBF' }}>New Asset</span></h1>
         
         <form onSubmit={handleSubmit}>
           <div className="input-group" style={{ marginTop: '40px' }}>
@@ -204,21 +208,39 @@ export default function AddPropertyPage() {
 
           <div className="grid-2">
             {renderCustomSelect("Category", form.property_type, [
-              { value: 'house', label: 'House' }, { value: 'apartment', label: 'Apartment' }, { value: 'land', label: 'Land' }, { value: 'house_land', label: 'House + Land' }
+              { value: 'house', label: 'House' }, 
+              { value: 'apartment', label: 'Apartment' }, 
+              { value: 'land', label: 'Land' }, 
+              { value: 'house_land', label: 'House + Land' }
             ], 'cat', 'property_type')}
-            {renderCustomSelect("Purpose", form.listing_purpose, [{ value: 'sale', label: 'For Sale' }, { value: 'rent', label: 'For Rent (Monthly)' }], 'purp', 'listing_purpose')}
+            
+            {renderCustomSelect("Market Status", form.listing_purpose, [
+                { value: 'sale', label: 'For Sale' }, 
+                { value: 'rent', label: 'For Rent (Monthly)' }
+            ], 'purp', 'listing_purpose')}
           </div>
 
           <div className="grid-2">
-            <div className="input-group"><label>Price (KES)</label><input required type="number" value={form.price} onChange={e => setForm({...form, price: e.target.value})} /></div>
+            <div className="input-group">
+                <label>Asking Price (KES)</label>
+                <input required type="number" placeholder="Enter amount" value={form.price} onChange={e => setForm({...form, price: e.target.value})} />
+            </div>
             {renderCustomSelect("County", form.county_id, counties, 'county', 'county_id')}
           </div>
 
           {renderCustomSelect("Sub-County / Area (Optional)", form.sub_county_id, subCounties, 'subcounty', 'sub_county_id', !form.county_id)}
 
           <div className="grid-2">
-            {form.property_type !== 'land' && (
-              <div className="input-group"><label>Total Rooms</label><input type="number" placeholder="e.g. 5" value={form.total_rooms} onChange={e => setForm({...form, total_rooms: e.target.value})} /></div>
+            {form.property_type !== 'land' ? (
+              <div className="input-group">
+                <label>Total Rooms</label>
+                <input type="number" placeholder="e.g. 5" value={form.total_rooms} onChange={e => setForm({...form, total_rooms: e.target.value})} />
+              </div>
+            ) : (
+              <div className="input-group">
+                <label>Land Status</label>
+                <input placeholder="e.g. Freehold / Leasehold" />
+              </div>
             )}
             <div className="input-group">
                 <label>{form.property_type.includes('land') ? 'Size (Acres/SqFt)' : 'Floor Area (SqFt)'}</label>
@@ -226,13 +248,19 @@ export default function AddPropertyPage() {
             </div>
           </div>
 
+          {/* KEY FEATURES SECTION */}
           <div className="input-group">
             <label>Key Features (Quick Select)</label>
             <div className="amenity-grid">
               {availableAmenities.map((amn) => (
-                <div key={amn.id} className={`amenity-chip ${selectedAmenities.includes(amn.name) ? 'selected' : ''}`} onClick={() => toggleAmenity(amn.name)}>
+                <button
+                  key={amn.id}
+                  type="button"
+                  onClick={() => toggleAmenity(amn.name)}
+                  className={`amenity-chip ${selectedAmenities.includes(amn.name) ? 'selected' : ''}`}
+                >
                   {selectedAmenities.includes(amn.name) ? '✓ ' : '+ '} {amn.name}
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -249,7 +277,7 @@ export default function AddPropertyPage() {
                 <span style={{ fontSize: '11px', fontWeight: '800', color: '#7B2CBF' }}>BROWSE FILES</span>
                 <input id="file-input" type="file" multiple accept="image/*" onChange={handleImageChange} style={{ display: 'none' }} />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '12px', marginTop: '20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '10px', marginTop: '20px' }}>
               {previews.map((src, i) => (
                 <div key={i} style={{ position: 'relative', height: '85px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #E5E7EB' }}>
                     <img src={src} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -260,7 +288,7 @@ export default function AddPropertyPage() {
           </div>
 
           <button type="submit" className="btn-submit" disabled={loading}>
-            {loading ? 'SYNCHRONIZING ASSETS...' : 'POST LISTING FOR VERIFICATION'}
+            {loading ? 'SYNCING ASSETS...' : 'REGISTER PROPERTY'}
           </button>
         </form>
       </div>

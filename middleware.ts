@@ -23,31 +23,25 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
   const path = request.nextUrl.pathname
-  
-  // Get role from user_metadata (Instant, no DB call)
   const role = user?.user_metadata?.role
 
-  // ── Access Control ──────────────────────────────────────
-
-  // 1. If trying to access Agent Dashboard
+  // 1. Protect Agent Dashboard (Betterment Staff Only)
   if (path.startsWith('/dashboard')) {
     if (!user) return NextResponse.redirect(new URL('/auth/login', request.url))
-    // Only Agents and Admins allowed
     if (role !== 'agent' && role !== 'admin') {
-      return NextResponse.redirect(new URL('/?error=unauthorized_access', request.url))
+      // If a regular user tries to enter, send them to the home page
+      return NextResponse.redirect(new URL('/?error=unauthorized', request.url))
     }
   }
 
-  // 2. If trying to access Admin Panel
+  // 2. Protect Admin Panel (Root Admin Only)
   if (path.startsWith('/admin')) {
-    if (!user) return NextResponse.redirect(new URL('/auth/login', request.url))
-    // Strictly Admins only
-    if (role !== 'admin') {
+    if (!user || role !== 'admin') {
       return NextResponse.redirect(new URL('/', request.url))
     }
   }
 
-  // 3. If logged in, don't show Login/Register pages
+  // 3. Redirect logged-in users away from Auth pages
   if ((path.startsWith('/auth/login') || path.startsWith('/auth/register')) && user) {
     return NextResponse.redirect(new URL('/', request.url))
   }
@@ -56,10 +50,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    '/dashboard/:path*',
-    '/admin/:path*',
-    '/auth/login',
-    '/auth/register',
-  ],
+  matcher: ['/dashboard/:path*', '/admin/:path*', '/auth/login', '/auth/register'],
 }
