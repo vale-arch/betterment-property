@@ -42,8 +42,6 @@ export default function AddPropertyPage() {
     async function fetchData() {
       const { data: cData } = await supabase.from('counties').select('*').order('name')
       if (cData) setCounties(cData)
-      
-      // Fetching the amenities from your Supabase table
       const { data: aData } = await supabase.from('amenities').select('*').order('name')
       if (aData) setAvailableAmenities(aData)
     }
@@ -60,17 +58,17 @@ export default function AddPropertyPage() {
     getSubCounties()
   }, [form.county_id])
 
-  // --- Image Handling Logic ---
+  // --- Elite Image Handling Logic ---
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const files = Array.from(e.target.files)
       if (images.length + files.length > MAX_IMAGES) {
-        alert(`You can only upload a maximum of ${MAX_IMAGES} photos.`)
+        alert(`Maximum ${MAX_IMAGES} photos allowed for elite listings.`)
         return
       }
       const oversized = files.filter(f => f.size > MAX_FILE_SIZE_MB * 1024 * 1024)
       if (oversized.length > 0) {
-        alert(`Some images are too large. Max size is ${MAX_FILE_SIZE_MB}MB.`)
+        alert(`Max file size is ${MAX_FILE_SIZE_MB}MB. Please optimize your photos.`)
         return
       }
       setImages(prev => [...prev, ...files])
@@ -82,6 +80,22 @@ export default function AddPropertyPage() {
   const removeImage = (idx: number) => {
     setImages(prev => prev.filter((_, i) => i !== idx))
     setPreviews(prev => prev.filter((_, i) => i !== idx))
+  }
+
+  // NEW: Logical function to move an image to the front (Cover position)
+  const makeCover = (idx: number) => {
+    setImages(prev => {
+      const newArr = [...prev];
+      const selected = newArr.splice(idx, 1)[0];
+      newArr.unshift(selected);
+      return newArr;
+    });
+    setPreviews(prev => {
+      const newArr = [...prev];
+      const selected = newArr.splice(idx, 1)[0];
+      newArr.unshift(selected);
+      return newArr;
+    });
   }
 
   const toggleAmenity = (name: string) => {
@@ -97,22 +111,21 @@ export default function AddPropertyPage() {
 
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error("Please sign in to list properties.")
+      if (!user) throw new Error("Authentication required.")
 
-      // 1. Send listing data to Properties Table
       const { data: property, error: pError } = await supabase
         .from('properties')
         .insert([{
           owner_id: user.id,
           title: form.title,
           description: form.description,
-          features: selectedAmenities, // Saving the Quick Select array
+          features: selectedAmenities,
           property_type: form.property_type,
           listing_purpose: form.listing_purpose,
           price: parseFloat(form.price),
           county_id: parseInt(form.county_id),
           sub_county_id: form.sub_county_id ? parseInt(form.sub_county_id) : null,
-          bedrooms: form.total_rooms ? parseInt(form.total_rooms) : 0, // Mapping rooms to DB
+          bedrooms: form.total_rooms ? parseInt(form.total_rooms) : 0,
           sq_ft: form.sqft ? parseInt(form.sqft) : 0,
           listing_status: 'pending' 
         }])
@@ -120,7 +133,6 @@ export default function AddPropertyPage() {
 
       if (pError) throw pError
 
-      // 2. Handle Image Uploads
       if (images.length > 0) {
         for (const file of images) {
           const fileName = `${Date.now()}-${file.name}`
@@ -129,13 +141,11 @@ export default function AddPropertyPage() {
           if (uploadError) throw uploadError
           const { data: { publicUrl } } = supabase.storage.from('Property-image').getPublicUrl(filePath)
           
-          // Save to images table and update main property array
           await supabase.from('property_images').insert([{ property_id: property.id, url: publicUrl }])
           await supabase.rpc('append_property_image', { prop_id: property.id, image_url: publicUrl })
         }
       }
-
-      alert("Success! Your listing has been sent for verification.")
+      alert("Asset registered successfully!")
       router.push('/dashboard')
     } catch (error: any) { alert(error.message) } finally { setLoading(false) }
   }
@@ -147,7 +157,7 @@ export default function AddPropertyPage() {
         <label>{label}</label>
         <div className={`custom-select-trigger ${activeDropdown === key ? 'active' : ''} ${disabled ? 'disabled' : ''}`}>
           <span>{disabled ? 'Select County first...' : displayValue}</span>
-          <span className="chevron" style={{ transform: activeDropdown === key ? 'rotate(180deg)' : 'none' }}>▼</span>
+          <span className="chevron">▼</span>
         </div>
         <AnimatePresence>
           {activeDropdown === key && (
@@ -170,7 +180,7 @@ export default function AddPropertyPage() {
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Bebas+Neue&display=swap');
         *, *::before, *::after { box-sizing: border-box; }
         body { font-family: 'Inter', sans-serif; }
-        .form-card { width: 100%; max-width: 850px; margin: 0 auto; background: #FFF; border: 1px solid #E5E7EB; border-radius: 24px; padding: 50px; box-shadow: 0 10px 40px rgba(0,0,0,0.04); }
+        .form-card { width: 100%; max-width: 900px; margin: 0 auto; background: #FFF; border: 1px solid #E5E7EB; border-radius: 24px; padding: 50px; box-shadow: 0 10px 40px rgba(0,0,0,0.04); }
         .input-group { margin-bottom: 25px; position: relative; }
         label { display: block; font-size: 10px; color: #2D004F; text-transform: uppercase; margin-bottom: 8px; font-weight: 800; letter-spacing: 1.5px; }
         .custom-select-trigger { width: 100%; background: #FFF; border: 1px solid #D1D5DB; border-radius: 12px; padding: 14px 18px; color: #1B1464; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: 0.2s; font-size: 14px; font-weight: 600; }
@@ -181,19 +191,27 @@ export default function AddPropertyPage() {
         input, textarea { width: 100%; background: #FFF; border: 1px solid #D1D5DB; border-radius: 12px; padding: 14px 18px; color: #1B1464; outline: none; transition: 0.2s; font-family: inherit; font-weight: 600; font-size: 14px; }
         input:focus, textarea:focus { border-color: #7B2CBF; }
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .amenity-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 15px; }
+        .amenity-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
         .amenity-chip { padding: 10px 18px; border-radius: 12px; border: 1px solid #E5E7EB; font-size: 11px; font-weight: 700; cursor: pointer; transition: 0.2s; background: white; color: #6B7280; }
         .amenity-chip.selected { background: #2D004F; color: white; border-color: #2D004F; }
         .btn-submit { background: #2D004F; color: #FFF; width: 100%; padding: 20px; border: none; border-radius: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; margin-top: 40px; transition: 0.3s; }
         .btn-submit:hover { background: #7B2CBF; transform: translateY(-2px); }
-        .image-upload-box { border: 2px dashed #D1D5DB; background: #FDFCF9; border-radius: 16px; padding: 40px; text-align: center; cursor: pointer; transition: 0.3s; }
+        .image-upload-box { border: 2px dashed #D1D5DB; background: #FDFCF9; border-radius: 16px; padding: 50px; text-align: center; cursor: pointer; transition: 0.3s; }
         .image-upload-box:hover { border-color: #7B2CBF; background: #F5EFFF; }
+        
+        .preview-card { position: relative; height: 120px; border-radius: 14px; overflow: hidden; border: 1px solid #E5E7EB; transition: 0.3s; }
+        .preview-card.is-cover { border: 3px solid #7B2CBF; transform: scale(1.05); z-index: 5; }
+        .cover-badge { position: absolute; top: 0; left: 0; background: #7B2CBF; color: white; font-size: 8px; font-weight: 900; padding: 3px 8px; border-radius: 0 0 8px 0; }
+        .cover-btn { position: absolute; bottom: 8px; left: 8px; right: 8px; background: rgba(255,255,255,0.9); border: none; font-size: 9px; font-weight: 800; padding: 5px; border-radius: 6px; cursor: pointer; color: #2D004F; }
+        .cover-btn:hover { background: #7B2CBF; color: white; }
+        .remove-btn { position: absolute; top: 8px; right: 8px; background: #EF4444; color: white; border: none; border-radius: 50%; width: 22px; height: 22px; cursor: pointer; font-size: 10px; font-weight: bold; }
+        
         @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } .form-card { padding: 30px 20px; } }
       `}</style>
 
       <div style={{ maxWidth: '850px', margin: '0 auto' }}>
         <Link href="/dashboard" style={{ textDecoration: 'none', color: '#6B7280', fontWeight: '800', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '30px', letterSpacing: '1px' }}>
-          ← CANCEL AND RETURN TO DASHBOARD
+          ← EXIT TO DASHBOARD
         </Link>
       </div>
 
@@ -213,18 +231,11 @@ export default function AddPropertyPage() {
               { value: 'land', label: 'Land' }, 
               { value: 'house_land', label: 'House + Land' }
             ], 'cat', 'property_type')}
-            
-            {renderCustomSelect("Market Status", form.listing_purpose, [
-                { value: 'sale', label: 'For Sale' }, 
-                { value: 'rent', label: 'For Rent (Monthly)' }
-            ], 'purp', 'listing_purpose')}
+            {renderCustomSelect("Purpose", form.listing_purpose, [{ value: 'sale', label: 'For Sale' }, { value: 'rent', label: 'For Rent (Monthly)' }], 'purp', 'listing_purpose')}
           </div>
 
           <div className="grid-2">
-            <div className="input-group">
-                <label>Asking Price (KES)</label>
-                <input required type="number" placeholder="Enter amount" value={form.price} onChange={e => setForm({...form, price: e.target.value})} />
-            </div>
+            <div className="input-group"><label>Price (KES)</label><input required type="number" placeholder="Enter amount" value={form.price} onChange={e => setForm({...form, price: e.target.value})} /></div>
             {renderCustomSelect("County", form.county_id, counties, 'county', 'county_id')}
           </div>
 
@@ -232,15 +243,9 @@ export default function AddPropertyPage() {
 
           <div className="grid-2">
             {form.property_type !== 'land' ? (
-              <div className="input-group">
-                <label>Total Rooms</label>
-                <input type="number" placeholder="e.g. 5" value={form.total_rooms} onChange={e => setForm({...form, total_rooms: e.target.value})} />
-              </div>
+              <div className="input-group"><label>Total Rooms</label><input type="number" placeholder="e.g. 5" value={form.total_rooms} onChange={e => setForm({...form, total_rooms: e.target.value})} /></div>
             ) : (
-              <div className="input-group">
-                <label>Land Status</label>
-                <input placeholder="e.g. Freehold / Leasehold" />
-              </div>
+              <div className="input-group"><label>Land Status</label><input placeholder="e.g. Freehold / Leasehold" /></div>
             )}
             <div className="input-group">
                 <label>{form.property_type.includes('land') ? 'Size (Acres/SqFt)' : 'Floor Area (SqFt)'}</label>
@@ -248,17 +253,11 @@ export default function AddPropertyPage() {
             </div>
           </div>
 
-          {/* KEY FEATURES SECTION */}
           <div className="input-group">
             <label>Key Features (Quick Select)</label>
             <div className="amenity-grid">
               {availableAmenities.map((amn) => (
-                <button
-                  key={amn.id}
-                  type="button"
-                  onClick={() => toggleAmenity(amn.name)}
-                  className={`amenity-chip ${selectedAmenities.includes(amn.name) ? 'selected' : ''}`}
-                >
+                <button key={amn.id} type="button" onClick={() => toggleAmenity(amn.name)} className={`amenity-chip ${selectedAmenities.includes(amn.name) ? 'selected' : ''}`}>
                   {selectedAmenities.includes(amn.name) ? '✓ ' : '+ '} {amn.name}
                 </button>
               ))}
@@ -271,17 +270,25 @@ export default function AddPropertyPage() {
           </div>
 
           <div className="input-group">
-            <label>Gallery (Max {MAX_IMAGES} photos • {images.length}/{MAX_IMAGES})</label>
+            <label>Portfolio Gallery (Max {MAX_IMAGES} photos • {images.length}/{MAX_IMAGES})</label>
+            <p style={{ fontSize: '11px', color: '#9CA3AF', marginBottom: '15px' }}>Tip: The first image will be used as the public cover photo.</p>
+            
             <div className="image-upload-box" onClick={() => document.getElementById('file-input')?.click()}>
                 <span style={{ fontSize: '24px', display: 'block', marginBottom: '10px' }}>🖼️</span>
-                <span style={{ fontSize: '11px', fontWeight: '800', color: '#7B2CBF' }}>BROWSE FILES</span>
+                <span style={{ fontSize: '11px', fontWeight: '800', color: '#7B2CBF' }}>UPLOAD ASSETS</span>
                 <input id="file-input" type="file" multiple accept="image/*" onChange={handleImageChange} style={{ display: 'none' }} />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '10px', marginTop: '20px' }}>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '15px', marginTop: '25px' }}>
               {previews.map((src, i) => (
-                <div key={i} style={{ position: 'relative', height: '85px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #E5E7EB' }}>
+                <div key={i} className={`preview-card ${i === 0 ? 'is-cover' : ''}`}>
                     <img src={src} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    <button type="button" onClick={(e) => { e.stopPropagation(); removeImage(i); }} style={{ position: 'absolute', top: '5px', right: '5px', background: '#EF4444', color: 'white', border: 'none', borderRadius: '50%', width: '20px', height: '20px', cursor: 'pointer', fontSize: '10px', fontWeight: 'bold' }}>✕</button>
+                    {i === 0 ? (
+                        <div className="cover-badge">PRIMARY COVER</div>
+                    ) : (
+                        <button type="button" className="cover-btn" onClick={() => makeCover(i)}>SET AS COVER</button>
+                    )}
+                    <button type="button" onClick={(e) => { e.stopPropagation(); removeImage(i); }} className="remove-btn">✕</button>
                 </div>
               ))}
             </div>

@@ -1,43 +1,94 @@
 'use client'
-import { MapPin, ShieldCheck, Bed, Bath, Move } from 'lucide-react';
+import { MapPin, Bed, Bath, Move, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
+import { supabaseLoader } from '@/lib/image-loader';
 
 export default function PropertyCard({ property }: { property: any }) {
+  // 1. Logic to find the best image URL
+  const displayImage = 
+    property.property_images?.[0]?.url || // Check the joined table
+    (Array.isArray(property.images) ? property.images[0] : null) || // Check the array column
+    '/images/placeholder-property.jpg'; // Hardcoded fallback
+
   return (
     <Link href={`/properties/${property.id}`} className="group block h-full">
-      <div className="bg-white rounded-[2.5rem] overflow-hidden border border-gray-100 hover:shadow-[0_30px_60px_-15px_rgba(163,67,47,0.15)] transition-all duration-700 h-full flex flex-col">
-        <div className="relative h-72 overflow-hidden">
-          <img src={property.images?.[0]} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" />
-          <div className="absolute top-5 left-5 bg-white/90 backdrop-blur-md px-4 py-1.5 rounded-full flex items-center gap-2 shadow-sm">
-            <ShieldCheck className="w-4 h-4 text-savannah-gold" />
-            <span className="text-[10px] font-black uppercase tracking-widest">Verified</span>
-          </div>
-          <div className="absolute bottom-5 left-5 text-white z-20">
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-savannah-gold mb-1">Price</p>
-            <p className="font-bebas text-3xl tracking-wider">KES {Number(property.price).toLocaleString()}</p>
-          </div>
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-        </div>
+      <div style={{
+        background: 'white',
+        borderRadius: '30px',
+        border: '1px solid rgba(45, 0, 79, 0.05)',
+        overflow: 'hidden',
+        transition: 'all 0.6s cubic-bezier(0.16, 1, 0.3, 1)',
+        boxShadow: '0 20px 50px rgba(45, 0, 79, 0.05)',
+        position: 'relative'
+      }} className="group-hover:-translate-y-2 group-hover:shadow-[0_40px_80px_rgba(45,0,79,0.12)]">
         
-        <div className="p-8 flex-1 flex flex-col">
-          <div className="flex items-center gap-2 text-gray-400 mb-3">
+        {/* --- Image Section --- */}
+        <div style={{ position: 'relative', height: '320px', width: '100%', background: '#1a1a1a' }}>
+  <Image 
+    loader={supabaseLoader}
+    src={displayImage}
+    alt={property.title}
+    fill
+    style={{ objectFit: 'cover', filter: 'contrast(1.05) brightness(1.05)' }} // Subtle photo enhancement
+    className="transition-transform duration-1000 group-hover:scale-105"
+  />
+  
+  {/* TOP-DOWN SOFT SHADOW (Makes the white badge pop) */}
+  <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, transparent 20%)', zIndex: 2 }} />
+
+  {/* BOTTOM-UP DARKNESS (Only for the price area) */}
+  <div style={{ 
+    position: 'absolute', bottom: 0, left: 0, right: 0, 
+    height: '50%', background: 'linear-gradient(to top, rgba(27, 20, 100, 0.9) 0%, transparent 100%)',
+    display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
+    padding: '30px', zIndex: 3
+  }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+        <div style={{ width: '12px', height: '2px', background: '#7B2CBF' }}></div>
+        <p style={{ color: '#7B2CBF', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '2px', margin: 0 }}>
+            Market Value
+        </p>
+    </div>
+    <h4 style={{ color: 'white', fontSize: '2rem', fontFamily: 'Bebas Neue', margin: 0, letterSpacing: '1px' }}>
+      KES {property.price?.toLocaleString()}
+    </h4>
+  </div>
+</div>
+
+        {/* --- Content Section --- */}
+        <div style={{ padding: '30px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#9CA3AF', marginBottom: '10px' }}>
             <MapPin className="w-3 h-3" />
-            <span className="text-[10px] font-bold uppercase tracking-widest">{property.sub_counties?.name || 'Savannah'}</span>
+            <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>
+              {property.sub_counties?.name || 'Private Location'}
+            </span>
           </div>
-          <h3 className="font-bebas text-3xl text-savannah-charcoal mb-6 group-hover:text-savannah-terracotta transition-colors">{property.title}</h3>
-          
-          <div className="mt-auto grid grid-cols-3 gap-4 pt-6 border-t border-gray-50">
-            <div className="flex flex-col items-center border-r border-gray-50">
-               <Bed className="w-4 h-4 text-savannah-gold mb-1" />
-               <span className="text-[10px] font-bold">{property.bedrooms || '—'} BEDS</span>
+
+          <h3 style={{ 
+            fontSize: '1.3rem', fontWeight: 800, color: '#1B1464', 
+            marginBottom: '25px', lineHeight: 1.2, height: '3.2rem',
+            overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical'
+          }}>
+            {property.title}
+          </h3>
+
+          {/* Stats Bar - Top Tier Layout */}
+          <div style={{ 
+            display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', 
+            paddingTop: '20px', borderTop: '1px solid #F3F4F6' 
+          }}>
+            <div style={{ textAlign: 'center', borderRight: '1px solid #F3F4F6' }}>
+              <Bed className="w-4 h-4 text-[#7B2CBF]" style={{ margin: '0 auto 5px' }} />
+              <p style={{ fontSize: '9px', fontWeight: 800, color: '#2D004F', margin: 0 }}>{property.bedrooms || '—'} ROOMS</p>
             </div>
-            <div className="flex flex-col items-center border-r border-gray-50">
-               <Bath className="w-4 h-4 text-savannah-gold mb-1" />
-               <span className="text-[10px] font-bold">{property.bathrooms || '—'} BATHS</span>
+            <div style={{ textAlign: 'center', borderRight: '1px solid #F3F4F6' }}>
+              <Move className="w-4 h-4 text-[#7B2CBF]" style={{ margin: '0 auto 5px' }} />
+              <p style={{ fontSize: '9px', fontWeight: 800, color: '#2D004F', margin: 0 }}>{property.sq_ft || '—'} SQFT</p>
             </div>
-            <div className="flex flex-col items-center">
-               <Move className="w-4 h-4 text-savannah-gold mb-1" />
-               <span className="text-[10px] font-bold uppercase">{property.sq_ft || '—'} SqFt</span>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22C55E', margin: '8px auto 8px' }}></div>
+              <p style={{ fontSize: '8px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase' }}>Active</p>
             </div>
           </div>
         </div>

@@ -8,6 +8,9 @@
     color: #1B1464;            /* Midnight Navy */
     font-family: 'Inter', sans-serif;
     -webkit-font-smoothing: antialiased;
+    background-color: #F8F9FA;
+    background-image: url("https://www.transparenttextures.com/patterns/cubes.png"); /* Very faint texture */
+    background-attachment: fixed;
   }
 }
 
@@ -41,3 +44,13 @@
   opacity: 1;
   transform: translateY(0);
 }
+
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.01em; /* Tighter, professional kerning */
+}
+
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: #F1F1F1; }
+::-webkit-scrollbar-thumb { background: #2D004F; border-radius: 10px; }

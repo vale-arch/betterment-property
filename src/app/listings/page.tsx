@@ -33,40 +33,41 @@ export default function ListingsPage() {
   }, [filter])
 
   const fetchListings = async (isReset = false) => {
-    setLoading(true)
-    const start = isReset ? 0 : page * ITEMS_PER_PAGE
-    const end = start + ITEMS_PER_PAGE - 1
+  setLoading(true);
+  const start = isReset ? 0 : page * ITEMS_PER_PAGE;
+  const end = start + ITEMS_PER_PAGE - 1;
 
-    let query = supabase
-      .from('properties')
-      .select('*, property_images(url), counties(name), sub_counties(name)', { count: 'exact' })
-      .eq('listing_status', 'active')
+  // SLIM SELECT: We removed 'description' and 'features' to make the data tiny
+  let query = supabase
+    .from('properties')
+    .select(`
+      id, title, price, bedrooms, sq_ft, property_type, listing_purpose,
+      counties(name), sub_counties(name), property_images(url)
+    `, { count: 'exact' })
+    .eq('listing_status', 'active');
 
-    if (filter.type !== 'all') query = query.eq('property_type', filter.type)
-    if (filter.purpose !== 'all') query = query.eq('listing_purpose', filter.purpose)
-    
-    const { data, count } = await query
-      .order('created_at', { ascending: false })
-      .range(start, end)
+  if (filter.type !== 'all') query = query.eq('property_type', filter.type);
+  if (filter.purpose !== 'all') query = query.eq('listing_purpose', filter.purpose);
+  
+  const { data, count } = await query
+    .order('created_at', { ascending: false })
+    .range(start, end);
 
-    if (data) {
-      if (isReset) {
-        setListings(data)
-        setPage(1)
-      } else {
-        setListings(prev => [...prev, ...data])
-        setPage(prev => prev + 1)
-      }
-      
-      // Check if we've reached the end
-      if (count && (isReset ? data.length : listings.length + data.length) >= count) {
-        setHasMore(false)
-      } else {
-        setHasMore(true)
-      }
-    }
-    setLoading(false)
+  if (data) {
+    // IMAGE OPTIMIZATION: Force Supabase to resize to 400px width
+    const optimizedData = data.map(p => ({
+      ...p,
+      displayImage: p.property_images?.[0]?.url 
+        ? `${p.property_images[0].url}?width=400&quality=70` 
+        : '/images/placeholder.jpg'
+    }));
+
+    if (isReset) { setListings(optimizedData); setPage(1); } 
+    else { setListings(prev => [...prev, ...optimizedData]); setPage(prev => prev + 1); }
+    setHasMore(count ? (isReset ? optimizedData.length : listings.length + optimizedData.length) < count : false);
   }
+  setLoading(false);
+};
 
   const toggleDropdown = (name: string) => {
     setOpenDropdown(openDropdown === name ? null : name)
