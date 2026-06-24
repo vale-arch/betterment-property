@@ -3,8 +3,12 @@ import PropertyClient from '@/components/properties/PropertyClient'
 import SimilarProperties from '@/components/properties/SimilarProperties';
 import Link from 'next/link'
 
+type Props = {
+  params: { id: string }
+}
+
 // 1. Dynamic SEO - Professional shared links for WhatsApp/Social Media
-export async function generateMetadata({ params }: { params: { id: string } }) {
+export async function generateMetadata({ params }: Props) {
   const supabase = createClient();
   const { data: p } = await supabase
     .from('properties')
@@ -25,7 +29,7 @@ export async function generateMetadata({ params }: { params: { id: string } }) {
   }
 }
 
-export default async function Page({ params }: { params: { id: string } }) {
+export default async function Page({ params }: Props) {
   const supabase = createClient();
   
   // 2. High-Speed Server Fetch
