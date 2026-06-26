@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import '@/app/globals.css';
+import '@app/globals.css';
 import { Bebas_Neue,Outfit }  from 'next/font/google';
 
 const bebas = Bebas_Neue({ weight: '400', subsets: ['latin'], variable: '--font-bebas' });
@@ -8,6 +8,10 @@ const outfit = Outfit({ subsets: ['latin'], variable: '--font-outfit' });
 export const metadata: Metadata = {
   title: 'Betterment Group Property | Kenya Real Estate',
   description: 'Find houses, land and commercial properties across Kenya',
+  icons:{
+    icon:'/icon.png',
+    apple:'/apple-icon.png',
+  }
 }
 
 export default function RootLayout({
